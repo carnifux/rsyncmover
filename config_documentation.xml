@@ -1,0 +1,125 @@
+<rsyncMover>
+    <watches>
+        <!-- directories to watch for moved files, and to download to -->
+        <watch>D:\downloads</watch>
+        <watch>D:\test</watch>
+    </watches>
+    <!-- required if moveFiles = true -->
+    <movers>
+        <!-- enable moving of files -->
+        <moveFiles>true</moveFiles>
+        <!-- deletes files from the watch directory if they already exist where they're being moved to -->
+        <deleteDuplicateFiles>true</deleteDuplicateFiles>
+        <!-- inherit from default movers -->
+        <useDefaultMatching>true</useDefaultMatching>
+        <!-- set from permissions for files moved and downloaded, as a posix string
+             only needed on linux, don't set on windows -->
+        <movedFilePermissions>rw-rw-rw-</movedFilePermissions>
+        <!-- each mover defines a folder to move to and the rules under which those can be matched -->
+        <mover>
+            <!-- names exist only to extend pre-defined groups, can be duplicated -->
+            <name>movies</name>
+            <targetDirectory>D:\movies</targetDirectory>
+        </mover>
+        <mover>
+            <name>tv</name>
+            <!-- target directories can have regex replacements in them that match on the file name
+                format is:
+                %source regex%target%
+                in the example, it will match for example
+                Tv.Show.s01e04.Title.mkv
+                the source regex needs to have groups defined
+                in the example, the groups will be "Tv.Show" and "01"
+                the replacement should be in the format of a string, with numbers 1 and increasing that match the groups
+                the example will turn into
+                Tv.Show\Season 01\
+                the full move for this example would be
+                D:\tv\Tv.Show\Season 01\Tv.Show.s01e04.Title.mkv
+
+                if the regex can't match the filename it will be ignored, for eg
+                Tv.Show.Season.1.Episode.4.Title.mkv -> D:\tv\Tv.Show.Season.1.Episode.4.Title.mkv -->
+            <targetDirectory>D:\tv\%(.*?)\.?s(\d{2})e\d{2}%1\Season 2\%</targetDirectory>
+        </mover>
+        <mover>
+            <name>music</name>
+            <!-- target directories can have date formats in them, surrounded by $
+                https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html -->
+            <targetDirectory>D:\music\_unsorted\new$yyyyMM$</targetDirectory>
+        </mover>
+        <mover>
+            <name>programs</name>
+            <targetDirectory>D:\programs</targetDirectory>
+        </mover>
+        <mover>
+            <name>my custom mover</name>
+            <targetDirectory>D:\custom</targetDirectory>
+            <patterns>
+                <!-- patterns should be valid regex, and match on from/folder names
+                     only one pattern needs to match for the mover to match-->
+                <pattern>720p|1080p</pattern>
+            </patterns>
+            <dontMatchPatterns>
+                <!-- dont match patterns define patterns that should NOT be matched -->
+                <pattern>1080i</pattern>
+            </dontMatchPatterns>
+            <extensions>
+                <!-- only move files with the following extensions, will look inside folders -->
+                <extension>m4a</extension>
+            </extensions>
+            <!-- partial match ="true" means that the pattern regex can match a substring
+                 or that extensions only need to match a single from
+                 if partial match is false, the regexes need to match the entire from/folder names,
+                 and ALL files need to match one of the specified extensions (if specified) -->
+            <partialMatch>true</partialMatch>
+        </mover>
+    </movers>
+    <!-- required if downloadFiles = true -->
+    <servers>
+        <!-- enable downloading of files -->
+        <downloadFiles>false</downloadFiles>
+        <minimumFreeSpaceToDownload>0</minimumFreeSpaceToDownload>
+        <mustMatchMoverForDownload>true</mustMatchMoverForDownload>
+        <!-- location of passivate from, required if downloadFiles = true -->
+        <passivateLocation>D:\passivate.txt</passivateLocation>
+        <!-- if true, reads the list of seen files each time it downloads.
+             reduced average memory footprint but more disk activity -->
+        <depassivateEachTime>true</depassivateEachTime>
+        <!-- how often to check for new files -->
+        <updateIntervalMinutes>15</updateIntervalMinutes>
+        <!-- set from permissions for files moved and downloaded, as a posix string
+             only needed on linux, don't set on windows -->
+        <movedFilePermissions>rw-rw-rw-</movedFilePermissions>
+        <!-- each server defines a single folder on a single server -->
+        <server>
+            <!-- the host name -->
+            <host>host.com</host>
+            <!-- port, default = 22 -->
+            <port>444</port>
+            <!-- username -->
+            <user>user</user>
+            <!-- password -->
+            <pass>hunter2</pass>
+            <directories>
+                <directory>
+                    <!-- absolute path to remote directory, ending with a / -->
+                    <directory>/absolute/path/</directory>
+                    <!-- if the directory is symlinked, this should be the directory it symlinks to, ending with a / -->
+                    <realDirectory>/absolute/real/path/</realDirectory>
+                </directory>
+            </directories>
+            <!-- if you get an unknown host error, add the host key here -->
+            <hostKey>2a:etc</hostKey>
+        </server>
+    </servers>
+    <!-- daily email summary settings nyi -->
+    <emailSummary>
+        <!-- enables daily email summaries of downloading and moving nyi -->
+        <emailReport>true</emailReport>
+        <!-- email address to send to -->
+        <to>carnifex266@gmail.com</to>
+        <!-- address that the mails will come from -->
+        <from>summary@rsyncmover.com</from>
+        <!-- time to send the email report at, defaults to midnight. will be in the default timezone. format: HHmm, ie 1200 -->
+        <sendEmailAt>2300</sendEmailAt>
+    </emailSummary>
+</rsyncMover>

@@ -1,0 +1,14 @@
+requires java 8
+
+see config_documentation for documentation on the config file, example_config for an example of a config that'll move to certain folders and download from a server every 10 minutes
+
+only sftp downloading supported at the moment
+
+
+build with:
+
+mvn install
+cd mover
+mvn assembly:assembly
+
+jar created in mover/target/rsyncMoverMover-0.1-SNAPSHOT-jar-with-dependencies.jar

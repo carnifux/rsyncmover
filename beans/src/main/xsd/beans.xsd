@@ -1,0 +1,270 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:element name="rsyncMover">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="watches">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element type="xs:string" name="watch" maxOccurs="unbounded" minOccurs="1">
+                                <xs:annotation>
+                                    <xs:documentation>directory to watch for moved files, and to download to</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="movers">
+                    <xs:annotation>
+                        <xs:documentation>required if moveFiles = true</xs:documentation>
+                    </xs:annotation>
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element type="xs:boolean" name="moveFiles" default="true">
+                                <xs:annotation>
+                                    <xs:documentation>enable moving of files</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:boolean" name="deleteDuplicateFiles" default="false">
+                                <xs:annotation>
+                                    <xs:documentation>deletes files from the watch directory if they already exist where they're being moved to</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:boolean" name="useDefaultMatching" default="true">
+                                <xs:annotation>
+                                    <xs:documentation>inherit from default movers</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:string" name="movedFilePermissions" minOccurs="0">
+                                <xs:annotation>
+                                    <xs:documentation>set from permissions for files moved and downloaded, as a posix string
+                                        only needed on linux, don't set on windows</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element name="mover" maxOccurs="unbounded" minOccurs="0">
+                                <xs:annotation>
+                                    <xs:documentation>each mover defines a folder to move to and the rules under which those can be matched</xs:documentation>
+                                </xs:annotation>
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element type="xs:string" name="name" minOccurs="0">
+                                            <xs:annotation>
+                                                <xs:documentation>names exist only to extend pre-defined groups, can be duplicated</xs:documentation>
+                                            </xs:annotation>
+                                        </xs:element>
+                                        <xs:element type="xs:string" name="targetDirectory" minOccurs="0" maxOccurs="1">
+                                            <xs:annotation>
+                                                <xs:documentation>target directories can have regex replacements in them that match on the file name
+                                                    format is:
+                                                    %source regex%target%
+                                                    in the example, it will match for example
+                                                    Tv.Show.s01e04.Title.mkv
+                                                    the source regex needs to have groups defined
+                                                    in the example, the groups will be "Tv.Show" and "01"
+                                                    the replacement should be in the format of a string, with numbers 1 and increasing that match the groups
+                                                    the example will turn into
+                                                    Tv.Show\Season 01\
+                                                    the full move for this example would be
+                                                    D:\tv\Tv.Show\Season 01\Tv.Show.s01e04.Title.mkv
+
+                                                    if the regex can't match the filename it will be ignored, for eg
+                                                    Tv.Show.Season.1.Episode.4.Title.mkv -> D:\tv\Tv.Show.Season.1.Episode.4.Title.mkv  target directories can have date formats in them, surrounded by $
+                                                    https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html</xs:documentation>
+                                            </xs:annotation>
+                                        </xs:element>
+                                        <xs:element name="patterns" minOccurs="0">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element type="xs:string" name="pattern" maxOccurs="unbounded" minOccurs="1">
+                                                        <xs:annotation>
+                                                            <xs:documentation>patterns should be valid regex, and match on from/folder names
+                                                                only one pattern needs to match for the mover to match</xs:documentation>
+                                                        </xs:annotation>
+                                                    </xs:element>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
+                                        <xs:element name="dontMatchPatterns" minOccurs="0">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element type="xs:string" name="pattern" maxOccurs="unbounded" minOccurs="1">
+                                                        <xs:annotation>
+                                                            <xs:documentation>dont match patterns define patterns that should NOT be matched</xs:documentation>
+                                                        </xs:annotation>
+                                                    </xs:element>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
+                                        <xs:element name="extensions" minOccurs="0">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element type="xs:string" name="extension" maxOccurs="unbounded" minOccurs="1">
+                                                        <xs:annotation>
+                                                            <xs:documentation>only move files with the following extensions, will look inside folders</xs:documentation>
+                                                        </xs:annotation>
+                                                    </xs:element>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
+                                        <xs:element type="xs:boolean" name="partialMatch" minOccurs="0">
+                                            <xs:annotation>
+                                                <xs:documentation>partial match ="true" means that the pattern regex can match a substring
+                                                    or that extensions only need to match a single from
+                                                    if partial match is false, the regexes need to match the entire from/folder names,
+                                                    and ALL files need to match one of the specified extensions (if specified)</xs:documentation>
+                                            </xs:annotation>
+                                        </xs:element>
+                                        <xs:element type="xs:string" name="moveOperation" minOccurs="0"></xs:element>
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="servers">
+                    <xs:annotation>
+                        <xs:documentation>required if downloadFiles = true</xs:documentation>
+                    </xs:annotation>
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element type="xs:boolean" name="downloadFiles" default="false">
+                                <xs:annotation>
+                                    <xs:documentation>enable downloading of files</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:string" name="movedFilePermissions" minOccurs="0">
+                                <xs:annotation>
+                                    <xs:documentation>set from permissions for files moved and downloaded, as a posix string
+                                        only needed on linux, don't set on windows</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:string" name="minimumFreeSpaceToDownload" default="0"></xs:element>
+                            <xs:element type="xs:boolean" name="mustMatchMoverForDownload" default="false"/>
+                            <xs:element type="xs:boolean" name="removePassivatedFilesIfNoLongerExistOnServer" default="true">
+                                <xs:annotation>
+                                    <xs:documentation>if the file doesn't exist on the server, remove it from the passivate file</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:string" name="passivateLocation">
+                                <xs:annotation>
+                                    <xs:documentation>location of passivate from, required if downloadFiles = true</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:boolean" name="depassivateEachTime" default="false">
+                                <xs:annotation>
+                                    <xs:documentation>if true, reads the list of seen files each time it downloads.
+                                        reduced average memory footprint but more disk activity</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:int" name="updateIntervalMinutes" default="15">
+                                <xs:annotation>
+                                    <xs:documentation>how often to check for new files</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element name="server" minOccurs="0" maxOccurs="unbounded">
+                                <xs:annotation>
+                                    <xs:documentation>each server defines a single folder on a single server</xs:documentation>
+                                </xs:annotation>
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element type="xs:string" name="name">
+                                            <xs:annotation>
+                                                <xs:documentation>name for the server. only needed if you're using multiple servers with the same host name</xs:documentation>
+                                            </xs:annotation>
+                                        </xs:element>
+                                        <xs:element type="xs:string" name="host">
+                                            <xs:annotation>
+                                                <xs:documentation>the host name</xs:documentation>
+                                            </xs:annotation>
+                                        </xs:element>
+                                        <xs:element type="xs:int" name="port" default="22">
+                                            <xs:annotation>
+                                                <xs:documentation>port, default = 22</xs:documentation>
+                                            </xs:annotation>
+                                        </xs:element>
+                                        <xs:element type="xs:string" name="user">
+                                            <xs:annotation>
+                                                <xs:documentation>username</xs:documentation>
+                                            </xs:annotation>
+                                        </xs:element>
+                                        <xs:element type="xs:string" name="pass">
+                                            <xs:annotation>
+                                                <xs:documentation>password</xs:documentation>
+                                            </xs:annotation>
+                                        </xs:element>
+                                        <xs:element name="directories">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element name="directory" maxOccurs="unbounded" minOccurs="0">
+                                                        <xs:complexType>
+                                                            <xs:sequence>
+                                                                <xs:element type="xs:string" name="directory" minOccurs="1">
+                                                                    <xs:annotation>
+                                                                        <xs:documentation>absolute path to remote directory, ending with a /</xs:documentation>
+                                                                    </xs:annotation>
+                                                                </xs:element>
+                                                                <xs:element type="xs:string" name="realDirectory" minOccurs="0">
+                                                                    <xs:annotation>
+                                                                        <xs:documentation>if the directory is symlinked, this should be the directory it symlinks to, ending with a /</xs:documentation>
+                                                                    </xs:annotation>
+                                                                </xs:element>
+                                                            </xs:sequence>
+                                                        </xs:complexType>
+                                                    </xs:element>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
+                                        <xs:element type="xs:string" name="hostKey" minOccurs="0">
+                                            <xs:annotation>
+                                                <xs:documentation>if you get an unknown host error, add the host key here</xs:documentation>
+                                            </xs:annotation>
+                                        </xs:element>
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="logs">
+                    <xs:annotation>
+                        <xs:documentation>log locations, nyi</xs:documentation>
+                    </xs:annotation>
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element type="xs:string" name="error"/>
+                            <xs:element type="xs:string" name="debug"/>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="emailSummary">
+                    <xs:annotation>
+                        <xs:documentation>daily email summary settings nyi</xs:documentation>
+                    </xs:annotation>
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element type="xs:boolean" name="emailReport">
+                                <xs:annotation>
+                                    <xs:documentation>enables daily email summaries of downloading and moving</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:string" name="to">
+                                <xs:annotation>
+                                    <xs:documentation>email address to send to</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:string" name="from">
+                                <xs:annotation>
+                                    <xs:documentation>address that the mails will come from</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:string" name="sendEmailAt">
+                                <xs:annotation>
+                                    <xs:documentation>time to send the email report at, defaults to midnight. will be in the default timezone. format: HHmm, ie 1200</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>
