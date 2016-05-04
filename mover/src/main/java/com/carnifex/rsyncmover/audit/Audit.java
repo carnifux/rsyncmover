@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 
 public class Audit {
 
+    private static final String HEADERS = "HTTP/1.0 200 OK\r\nServer: rsyncMover\r\nContent-type: text/html\r\n\r\n";
     private final Set<String> duplicate;
     private final Set<String> moved;
     private final Set<String> downloaded;
@@ -45,7 +46,7 @@ public class Audit {
     }
 
     public String formatAll() {
-        final StringBuilder message = new StringBuilder(headers());
+        final StringBuilder message = new StringBuilder(HEADERS);
         message.append("<html><body>");
         message.append(makeUptime(startTime));
         if (!errorAll.isEmpty()) {
@@ -73,7 +74,7 @@ public class Audit {
     }
 
     public String formatToday() {
-        final StringBuilder message = new StringBuilder(headers());
+        final StringBuilder message = new StringBuilder(HEADERS);
         message.append("<html><body>");
         message.append(makeUptime(startTime));
         if (!error.isEmpty()) {
@@ -129,10 +130,6 @@ public class Audit {
 
     private String makeTitle(final String title) {
         return "<br />================" + title + "================<br /><br />";
-    }
-
-    private String headers() {
-        return "HTTP/1.0 200 OK\r\nServer: rsyncMover\r\nDate: \r\n" + LocalDateTime.now().toString() + "\r\nContent-type: text/html\r\n\r\n";
     }
 
     public void accessing() {

@@ -6,6 +6,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -23,12 +24,12 @@ public class Server extends Thread {
             throw new RuntimeException(e);
         }
         this.audit = audit;
+        logger.info("Web server successfully initialized on port " + port);
         start();
     }
 
     @Override
     public void run() {
-        logger.info("Web server successfully initialized");
         for (;;) {
             try {
                 final Socket s = socket.accept();
@@ -55,7 +56,12 @@ public class Server extends Thread {
         public void run() {
             logger.info("Request received from " + s.getInetAddress().toString() + ", sending audit summary");
             try {
-                s.getOutputStream().write(audit.formatAll().getBytes());
+                final OutputStream os = s.getOutputStream();
+                os.write(audit.formatAll().getBytes());
+                os.flush();
+                // finish the output to make docker containers happy
+                s.shutdownOutput();
+                os.close();
                 s.close();
             } catch (IOException e) {
                 final String msg = "IOException from ServerThread socket";
