@@ -1,7 +1,7 @@
 package com.carnifex.rsyncmover.sync;
 
 
-import com.carnifex.rsyncmover.email.Emailer;
+import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.mover.io.Mover;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -31,12 +31,12 @@ public class Syncer extends Thread {
     private volatile boolean sleeping;
     private final List<Mover> movers;
     private final long minimumSpace;
-    private final Emailer emailer;
     private final Set<PosixFilePermission> filePermissions;
+    private final Audit audit;
 
     public Syncer(final List<String> dlDirs, final List<Ssh> sshs, final SyncedFiles syncedFiles, final int syncFrequency,
                   final boolean passivateEachTime, final long minimumSpace, final Set<PosixFilePermission> filePermissions,
-                  final boolean downloadsMustMatchMover, final List<Mover> movers, final Emailer emailer) {
+                  final boolean downloadsMustMatchMover, final List<Mover> movers, final Audit audit) {
         super("Syncer");
         this.dlDirs = dlDirs;
         this.syncedFiles = syncedFiles;
@@ -45,7 +45,7 @@ public class Syncer extends Thread {
         this.passivateEachTime = passivateEachTime;
         this.movers = downloadsMustMatchMover ? movers : Collections.emptyList();
         this.minimumSpace = minimumSpace;
-        this.emailer = emailer;
+        this.audit = audit;
         this.filePermissions = filePermissions;
 
         this.running = true;
@@ -59,7 +59,7 @@ public class Syncer extends Thread {
                 final List<String> allFiles = ssh.listFiles();
                 logger.debug("Received following files from ssh: " + allFiles.stream().map(this::normalize).collect(Collectors.joining(", ")));
                 final List<String> shouldDownload = allFiles.stream()
-                        .peek(file -> emailer.addSeen(normalize(file)))
+                        .peek(file -> audit.addSeen(normalize(file)))
                         .filter(file -> syncedFiles.shouldDownload(ssh.getServerName(), normalize(file)))
                         .filter(file -> {
                             final boolean result = this.movers.isEmpty() || this.movers.stream().filter(mover -> mover.shouldSubmit(Paths.get(file))).count() == 1;
@@ -83,17 +83,17 @@ public class Syncer extends Thread {
                             } catch (Exception e) {
                                 final String msg = "Error setting file permissions on downloaded files";
                                 logger.error(msg, e);
-                                emailer.addError(msg, e);
+                                audit.addError(msg, e);
                             }
                         }
                         syncedFiles.addDownloadedPath(ssh.getServerName(), normalize(path));
-                        emailer.addDownloaded(path);
+                        audit.addDownloaded(path);
                     });
                 }
             } catch (Exception e) {
                 final String msg = "Exception downloading or listing files";
                 logger.error(msg, e);
-                emailer.addError(msg, e);
+                audit.addError(msg, e);
             }
         }
         logger.debug("Finished downloading new files");

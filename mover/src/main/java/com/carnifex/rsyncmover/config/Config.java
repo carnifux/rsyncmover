@@ -79,6 +79,10 @@ public class Config {
         return LocalTime.parse(time != null ? time : "0000", DateTimeFormatter.ofPattern("HHmm"));
     }
 
+    public int getPort() {
+        return config.getWebServer().getPort();
+    }
+
     private long getMultiplier(final String freeSpace) {
         switch (freeSpace.charAt(freeSpace.length() - 1)) {
             case 'K':

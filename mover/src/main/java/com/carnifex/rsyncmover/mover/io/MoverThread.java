@@ -1,7 +1,7 @@
 package com.carnifex.rsyncmover.mover.io;
 
 
-import com.carnifex.rsyncmover.email.Emailer;
+import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.mover.Permissions;
 import com.carnifex.rsyncmover.mover.operators.MoveOperator;
 import org.apache.commons.io.FileUtils;
@@ -23,16 +23,16 @@ public class MoverThread extends Thread {
     private final BlockingQueue<PathObject> pathObjectQueue;
     private final Set<PosixFilePermission> filePermissions;
     private final boolean deleteDuplicateFiles;
-    private final Emailer emailer;
+    private final Audit audit;
     private volatile boolean shutdown;
 
-    public MoverThread(final Set<PosixFilePermission> filePermissions, final boolean deleteDuplicateFiles, final Emailer emailer) {
+    public MoverThread(final Set<PosixFilePermission> filePermissions, final boolean deleteDuplicateFiles, final Audit audit) {
         super("MoverThread");
         this.pathObjectQueue = new LinkedBlockingQueue<>();
         this.filePermissions = filePermissions;
         this.deleteDuplicateFiles = deleteDuplicateFiles;
-        this.emailer = emailer;
         this.shutdown = false;
+        this.audit = audit;
         this.start();
     }
 
@@ -71,17 +71,17 @@ public class MoverThread extends Thread {
                 } else {
                     Files.delete(pathObject.getTo());
                 }
-                emailer.addDuplicateDeletion(pathObject.getTo().toString());
+                audit.addDuplicateDeletion(pathObject.getTo().toString());
             }
             pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions);
-            emailer.addMoved(pathObject.getFrom().toString(), pathObject.getTo().toString(), pathObject.getOperator().getMethod());
+            audit.addMoved(pathObject.getFrom().toString(), pathObject.getTo().toString(), pathObject.getOperator().getMethod());
             if (filePermissions != null && pathObject.getOperator().shouldSetFilePermissions()) {
                 Permissions.setPermissions(pathObject.getTo(), filePermissions);
             }
         } catch (Exception e) {
             final String s = "Error moving from " + pathObject.getFrom().toString() + " to " + pathObject.getTo().toString();
             logger.error(s, e);
-            emailer.addError(s, e);
+            audit.addError(s, e);
         }
     }
 

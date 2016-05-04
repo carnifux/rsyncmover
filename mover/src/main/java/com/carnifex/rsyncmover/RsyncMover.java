@@ -1,6 +1,7 @@
 package com.carnifex.rsyncmover;
 
 
+import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.config.Config;
 import com.carnifex.rsyncmover.config.ConfigLoader;
 import com.carnifex.rsyncmover.email.Emailer;
@@ -11,6 +12,7 @@ import com.carnifex.rsyncmover.mover.io.MoverThread;
 import com.carnifex.rsyncmover.sync.Ssh;
 import com.carnifex.rsyncmover.sync.SyncedFiles;
 import com.carnifex.rsyncmover.sync.Syncer;
+import com.carnifex.rsyncmover.web.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -29,11 +31,12 @@ public class RsyncMover {
 
     public static void start(final String configPath) {
         final Config config = new Config(new ConfigLoader().load(configPath));
-        final Emailer emailer = new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(), config.getEmail().getFrom(), config.getEmailSendTime());
+        final Audit audit = new Audit();
+        final Emailer emailer = new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(), config.getEmail().getFrom(), config.getEmailSendTime(), audit);
         final List<Mover> movers = config.getMovers().stream().map(Mover::new).collect(Collectors.toList());
 
         if (config.moveFiles()) {
-            final MoverThread moverThread = new MoverThread(config.getFilePermissions(), config.getDeleteDuplicateFiles(), emailer);
+            final MoverThread moverThread = new MoverThread(config.getFilePermissions(), config.getDeleteDuplicateFiles(), audit);
             final FileChangeWatcher fileChangeWatcher = new FileChangeWatcher(movers, moverThread);
             final String passivateLocation = config.getPassivateLocation();
             final List<FileWatcher> watchers = config.getWatchDir().stream().map(watch -> new FileWatcher(watch,
@@ -59,7 +62,7 @@ public class RsyncMover {
             final SyncedFiles syncedFiles = new SyncedFiles(Paths.get(config.getPassivateLocation()));
             final Syncer syncer = new Syncer(config.getWatchDir(), sshs, syncedFiles, config.getSyncFrequency(),
                     config.shouldDepassivateEachTime(), config.getMinimumFreeSpaceForDownload(), config.getFilePermissions(),
-                    config.downloadsMustMatchMover(), movers, emailer);
+                    config.downloadsMustMatchMover(), movers, audit);
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override
                 public void run() {
@@ -69,8 +72,9 @@ public class RsyncMover {
             });
             logger.info("File downloading successfully initiated");
         }
-
-        if (!config.downloadFiles() && !config.moveFiles()) {
+        if (config.downloadFiles() || config.moveFiles()) {
+            final Server server = new Server(config.getPort(), audit);
+        } else {
             logger.info("No operations configured, shutting down");
         }
     }

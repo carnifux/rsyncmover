@@ -264,6 +264,14 @@
                         </xs:sequence>
                     </xs:complexType>
                 </xs:element>
+                <xs:element name="webServer">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element type="xs:boolean" name="webServer"></xs:element>
+                            <xs:element type="xs:int" name="port"/>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
             </xs:sequence>
         </xs:complexType>
     </xs:element>

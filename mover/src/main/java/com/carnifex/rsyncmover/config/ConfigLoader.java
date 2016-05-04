@@ -38,6 +38,9 @@ public class ConfigLoader {
             if (mover.getEmailSummary() == null) {
                 mover.setEmailSummary(new RsyncMover.EmailSummary());
             }
+            if (mover.getWebServer() == null) {
+                mover.setWebServer(new RsyncMover.WebServer());
+            }
             if (mover.getMovers().isUseDefaultMatching()) {
                 updateMover(mover, loadBase());
             }
