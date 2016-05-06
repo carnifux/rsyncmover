@@ -40,7 +40,7 @@ public class Mover {
         this.negativePatterns = mover.getDontMatchPatterns() != null ? mover.getDontMatchPatterns().getPattern()
                 .stream().map(Pattern::compile).collect(Collectors.toList()) : Collections.emptyList();
         this.extensions = mover.getExtensions() != null ? mover.getExtensions().getExtension().stream().map(String::toLowerCase).collect(Collectors.toList()) : Collections.emptyList();
-        this.partialMatch = mover.isPartialMatch();
+        this.partialMatch = mover.isPartialMatch() != null ? mover.isPartialMatch() : false;
         this.target = new Target(mover.getTargetDirectory());
         this.operator = MoveOperator.create(mover.getMoveOperation() != null ? mover.getMoveOperation() : DEFAULT_MOVE_OPERATION);
         logger.info("Mover for target directory " + target.partialPaths.stream().collect(Collectors.joining()) + " with move operation " + operator.getMethod() + " successfully initialized");

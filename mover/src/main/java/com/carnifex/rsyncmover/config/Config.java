@@ -8,11 +8,15 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Config {
 
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HHmm");
     private final RsyncMover config;
 
     public Config(final RsyncMover config) {
@@ -74,9 +78,14 @@ public class Config {
         return (long) (Double.valueOf(minimumFreeSpaceToDownload.replaceAll("[^\\d\\.]", "")) * multiplier);
     }
 
-    public LocalTime getEmailSendTime() {
+    public List<LocalTime> getEmailSendTime() {
         final String time = config.getEmailSummary().getSendEmailAt();
-        return LocalTime.parse(time != null ? time : "0000", DateTimeFormatter.ofPattern("HHmm"));
+        return time == null ? Collections.singletonList(LocalTime.parse("0000", TIME))
+                : Stream.of(time.split(";")).map(eachTime -> LocalTime.parse(eachTime, TIME)).collect(Collectors.toList());
+    }
+
+    public boolean runServer() {
+        return config.getWebServer().isWebServer();
     }
 
     public int getPort() {

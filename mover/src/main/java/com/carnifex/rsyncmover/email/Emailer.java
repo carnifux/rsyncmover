@@ -46,21 +46,20 @@ public class Emailer extends Thread {
             this.properties.put("mail.smtp.from", from);
             this.properties.put("mail.smtp.allow8bitmime", "true");
             this.setDaemon(true);
-            this.start();
-            logger.info("Email summary successfully initiated");
         }
     }
 
     @Override
     public void run() {
+        logger.info("Email summary successfully initiated at time " + timeToSendEmail);
         for (;;) {
             try {
                 final long sleepTime = nextEmailTime();
                 logger.info("Sending next email in " + TimeUnit.MILLISECONDS.toMinutes(sleepTime) + " minutes");
                 Thread.sleep(sleepTime);
             } catch (InterruptedException e) {
-                logger.error("Emailer thread interrupted", e);
-                continue; // just try to keep sleeping until we need to send the email
+                logger.debug("Emailer thread interrupted", e);
+                return;
             }
             send();
         }
@@ -83,7 +82,7 @@ public class Emailer extends Thread {
             message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
             message.setSubject("RsyncMover Email Summary " + LocalDate.now().format(formatter));
             audit.accessing();
-            message.setContent(audit.formatToday(), emailContentType);
+            message.setContent(audit.formatEmail(), emailContentType);
             audit.clear();
             audit.stopAccessing();
             Transport.send(message);

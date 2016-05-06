@@ -125,12 +125,12 @@ public class Syncer extends Thread {
     @Override
     public void run() {
         for (;;) {
-            if (!running) {
-                break;
-            }
-            sync();
-            sleeping = true;
             try {
+                if (!running) {
+                    break;
+                }
+                sync();
+                sleeping = true;
                 Thread.sleep(syncFrequency);
             } catch (InterruptedException e) {
                 logger.debug("Interrupted", e);
@@ -140,6 +140,17 @@ public class Syncer extends Thread {
     }
 
     public void shutdown() {
+        if (!sleeping) {
+            logger.info("Waiting for downloads to finish before shutting down thread");
+            while (!sleeping) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    logger.error("Syncer shutdown interrupted whilst waiting for download to finish", e);
+                }
+            }
+            logger.info("Downloads finished, shutting down thread");
+        }
         syncedFiles.finished();
         this.running = false;
         if (sleeping) {

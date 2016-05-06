@@ -25,6 +25,7 @@ public class MoverThread extends Thread {
     private final boolean deleteDuplicateFiles;
     private final Audit audit;
     private volatile boolean shutdown;
+    private volatile boolean moving;
 
     public MoverThread(final Set<PosixFilePermission> filePermissions, final boolean deleteDuplicateFiles, final Audit audit) {
         super("MoverThread");
@@ -32,8 +33,10 @@ public class MoverThread extends Thread {
         this.filePermissions = filePermissions;
         this.deleteDuplicateFiles = deleteDuplicateFiles;
         this.shutdown = false;
+        this.moving = false;
         this.audit = audit;
         this.start();
+        logger.info("MoverThread initialised");
     }
 
     @Override
@@ -43,10 +46,13 @@ public class MoverThread extends Thread {
             try {
                 poll = pathObjectQueue.poll(1, TimeUnit.DAYS);
                 if (poll != null) {
+                    moving = true;
                     move(poll);
                 }
             } catch (InterruptedException e) {
                 logger.debug("MoverThread interrupted", e);
+            } finally {
+                moving = false;
             }
         }
     }
@@ -54,6 +60,17 @@ public class MoverThread extends Thread {
     public void shutdown() {
         logger.info("Registering shutdown, " + pathObjectQueue.size() + " items left in queue");
         this.shutdown = true;
+        if (!pathObjectQueue.isEmpty() || moving) {
+            logger.info("Waiting for file move to finish before shutdown");
+            while (moving && !pathObjectQueue.isEmpty()) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    logger.error("Interrupted whilst waiting for moves to finish on shutdown", e);
+                }
+            }
+        }
+
     }
 
     public void submit(final Path from, final Path to, final MoveOperator operator) {

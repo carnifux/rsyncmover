@@ -73,8 +73,8 @@ public class Audit {
         return message.toString();
     }
 
-    public String formatToday() {
-        final StringBuilder message = new StringBuilder(HEADERS);
+    public String formatEmail() {
+        final StringBuilder message = new StringBuilder();
         message.append("<html><body>");
         message.append(makeUptime(startTime));
         if (!error.isEmpty()) {
@@ -101,15 +101,21 @@ public class Audit {
         return message.toString();
     }
 
+    // visible for testing
     String makeUptime(final LocalDateTime startTime) {
-        final Period period = Period.between(startTime.toLocalDate(), LocalDate.now());
-        final Duration duration = Duration.between(startTime, LocalDateTime.now());
+        final LocalDate nowDate = LocalDate.now();
+        final LocalDateTime nowTime = LocalDateTime.now();
+        final Period period = Period.between(startTime.toLocalDate(), nowDate);
+        final Duration duration = Duration.between(startTime, nowTime);
+        final long seconds = duration.getSeconds();
+        final long rawHours = seconds / (60L * 60L);
+        final long hours = rawHours % 24L;
+        final long minutes = (seconds - (rawHours * 60L * 60L)) / 60L;
         final int years = period.getYears();
         final int months = period.getMonths();
-        final int days = period.getDays();
-        final long seconds = duration.getSeconds();
-        final long hours = (seconds / (60L * 60L)) % 24L;
-        final long minutes = (seconds - ((seconds / (60L * 60L)) * 60L * 60L)) / 60L;
+        // subtract a day if 24 hours havent passed yet so days cant possibly be >0
+        // or if we've passed a day boundary (ie 23:00 -> 01:00), as Period will count this as an extra day
+        final int days = Math.max(0, rawHours >= 24 && nowTime.minusHours(hours).toLocalDate().isEqual(nowDate) ? period.getDays() : period.getDays() - 1);
 
         final StringBuilder builder = new StringBuilder("Uptime: ");
         if (years > 0) {

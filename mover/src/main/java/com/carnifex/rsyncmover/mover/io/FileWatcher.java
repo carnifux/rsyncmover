@@ -57,7 +57,8 @@ public class FileWatcher extends Thread {
                 key = watcher.take();
             } catch (InterruptedException e) {
                 // should never happen except on shutdown when we dont care
-                throw new RuntimeException(e);
+                logger.debug("Interrupted exception", e);
+                return;
             }
 
             for (final WatchEvent<?> event: key.pollEvents()) {

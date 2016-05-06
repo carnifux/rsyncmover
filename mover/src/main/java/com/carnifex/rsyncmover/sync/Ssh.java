@@ -45,18 +45,29 @@ public class Ssh {
         logger.info("Ssh client for server " + server + ":" + port + ", monitoring " + remoteDirectory + " successfully initialized");
     }
 
+    public void shutdown() {
+        try {
+            this.client.close();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public String getServerName() {
         return server;
     }
 
     public List<String> listFiles() {
         try {
+            client.connect();
             final List<RemoteResourceInfo> ls = client.getSftp().ls(remoteDirectory);
             return ls.stream()
                     .map(RemoteResourceInfo::getName)
                     .collect(Collectors.toList());
         } catch (Exception e) {
             throw new RuntimeException(e);
+        } finally {
+            client.disconnect();
         }
     }
 
@@ -68,9 +79,9 @@ public class Ssh {
         if (files.isEmpty()) {
             return;
         }
-        try {
+        client.connect();
+        try (final SFTPClient sftp = client.getSftp()){
             for (final String file : files) {
-                final SFTPClient sftp = client.getSftp();
                 final String source = remoteDirectory + file;
                 try {
                     sftp.get(source, target);
@@ -95,15 +106,17 @@ public class Ssh {
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
+        } finally {
+            client.disconnect();
         }
     }
 
 
     private final class SshClient implements AutoCloseable {
-        private SSHClient ssh;
-        private SFTPClient sftp;
+        private final SSHClient ssh;
 
         public SshClient() {
+            this.ssh = new SSHClient();
             try {
                 init();
             } catch (IOException e) {
@@ -112,39 +125,48 @@ public class Ssh {
         }
 
         public SFTPClient getSftp() {
-            return this.sftp;
+            try {
+                return ssh.newSFTPClient();
+            } catch (IOException e) {
+                logger.error("Error creating new SFTP client", e);
+                throw new RuntimeException(e);
+            }
         }
 
         private void init() throws IOException {
             try {
-                this.ssh = new SSHClient();
-                try {
-                    ssh.loadKnownHosts();
-                } catch (IOException e) {
-                    logger.warn("Error loading known hosts, continuing");
-                }
-                if (hostKey != null) {
-                    ssh.addHostKeyVerifier(hostKey);
-                }
+                ssh.loadKnownHosts();
+            } catch (IOException e) {
+                logger.warn("Error loading known hosts, continuing");
+            }
+            if (hostKey != null) {
+                ssh.addHostKeyVerifier(hostKey);
+            }
+        }
+
+        public void connect() {
+            try {
                 ssh.connect(server, port);
                 ssh.authPassword(user, pass);
             } catch (IOException e) {
-                this.ssh.close();
-                throw e;
+                final String msg = "Error connecting to " + user + "@" + server + ":" + port;
+                logger.error(msg, e);
+                throw new RuntimeException(e);
             }
+        }
 
+        public void disconnect() {
             try {
-                this.sftp = ssh.newSFTPClient();
+                ssh.disconnect();
             } catch (IOException e) {
-                this.sftp.close();
-                this.ssh.close();
-                throw e;
+                final String msg = "Error disconnecting from " + user + "@" + server + ":" + port;
+                logger.error(msg, e);
+                throw new RuntimeException(e);
             }
         }
 
         @Override
         public void close() throws Exception {
-            this.sftp.close();
             this.ssh.close();
         }
     }

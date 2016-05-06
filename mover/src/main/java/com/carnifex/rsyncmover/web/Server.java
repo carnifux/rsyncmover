@@ -18,6 +18,7 @@ public class Server extends Thread {
     private final Audit audit;
 
     public Server(final int port, final Audit audit) {
+        super("Server");
         try {
             this.socket = new ServerSocket(port);
         } catch (IOException e) {
@@ -28,6 +29,17 @@ public class Server extends Thread {
         start();
     }
 
+    public void shutdown() {
+        try {
+            this.interrupt();
+            socket.close();
+        } catch (IOException e) {
+            final String msg = "Exception closing server socket on thread interruption";
+            logger.error(msg, e);
+            audit.addError(msg, e);
+        }
+    }
+
     @Override
     public void run() {
         for (;;) {
@@ -35,11 +47,13 @@ public class Server extends Thread {
                 final Socket s = socket.accept();
                 new ServerThread(s).start();
             } catch (IOException e) {
+                if (this.isInterrupted()) {
+                    return;
+                }
                 final String msg = "IOException from server socket";
                 logger.error(msg, e);
                 audit.addError(msg, e);
             }
-
         }
     }
 
@@ -61,12 +75,16 @@ public class Server extends Thread {
                 os.flush();
                 // finish the output to make docker containers happy
                 s.shutdownOutput();
-                os.close();
-                s.close();
             } catch (IOException e) {
                 final String msg = "IOException from ServerThread socket";
                 logger.error(msg, e);
                 audit.addError(msg, e);
+            } finally {
+                try {
+                    s.close();
+                } catch (IOException e) {
+                    logger.info("Exception closing socket", e);
+                }
             }
         }
     }

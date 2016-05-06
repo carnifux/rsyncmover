@@ -43,10 +43,11 @@ public class FileChangeWatcher extends Thread {
         for (;;) {
             try {
                 Thread.sleep(UPDATE_INTERVAL);
+                checkFilesToMove();
             } catch (InterruptedException e) {
                 logger.debug("Interrupted", e);
+                return;
             }
-            checkFilesToMove();
         }
     }
 
