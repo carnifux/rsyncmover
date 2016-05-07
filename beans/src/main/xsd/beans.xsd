@@ -224,17 +224,7 @@
                         </xs:sequence>
                     </xs:complexType>
                 </xs:element>
-                <xs:element name="logs">
-                    <xs:annotation>
-                        <xs:documentation>log locations, nyi</xs:documentation>
-                    </xs:annotation>
-                    <xs:complexType>
-                        <xs:sequence>
-                            <xs:element type="xs:string" name="error"/>
-                            <xs:element type="xs:string" name="debug"/>
-                        </xs:sequence>
-                    </xs:complexType>
-                </xs:element>
+                <xs:element name="logLevel" type="xs:string"></xs:element>
                 <xs:element name="emailSummary">
                     <xs:annotation>
                         <xs:documentation>daily email summary settings nyi</xs:documentation>

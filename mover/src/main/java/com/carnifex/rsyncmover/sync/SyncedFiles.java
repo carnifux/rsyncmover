@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 public class SyncedFiles {
 
-    private static final Logger logger = LogManager.getLogger(SyncedFiles.class);
+    private static final Logger logger = LogManager.getLogger();
     private static final String SERVER_SEPARATOR = ":::";
 
     private volatile Map<String, Set<String>> synced;

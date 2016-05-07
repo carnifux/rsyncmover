@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 public class RsyncMover {
 
-    private static final Logger logger = LogManager.getLogger(RsyncMover.class);
+    private static final Logger logger = LogManager.getLogger();
     private static final Map<Class<?>, Object> components = new ConcurrentHashMap<>();
 
 
@@ -99,8 +99,8 @@ public class RsyncMover {
 
     @SuppressWarnings("unchecked")
     private static void shutdownAll() {
-        final Emailer emailer = (Emailer) components.remove(Emailer.class);
-        emailer.interrupt();
+        final List<Emailer> emailer = (List<Emailer>) components.remove(Emailer.class);
+        emailer.forEach(Thread::interrupt);
         // shut down movers first so any current downloads arent moved with old movers
         if (components.containsKey(MoverThread.class)) {
             final MoverThread moverThread = (MoverThread) components.remove(MoverThread.class);
@@ -112,7 +112,6 @@ public class RsyncMover {
         }
         if (components.containsKey(Syncer.class)) {
             final List<Ssh> sshs = (List<Ssh>) components.remove(Ssh.class);
-            sshs.forEach(Ssh::shutdown);
             final Syncer syncer = (Syncer) components.remove(Syncer.class);
             syncer.shutdown();
         }

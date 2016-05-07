@@ -19,7 +19,7 @@ import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
 public class FileWatcher extends Thread {
 
-    private static final Logger logger = LogManager.getLogger(FileWatcher.class);
+    private static final Logger logger = LogManager.getLogger();
 
     private final Path dir;
     private final WatchService watcher;

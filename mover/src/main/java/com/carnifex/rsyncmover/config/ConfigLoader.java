@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 
 public class ConfigLoader {
 
-    private static final Logger logger = LogManager.getLogger(ConfigLoader.class);
+    private static final Logger logger = LogManager.getLogger();
     private static final String defaultConfigPath = "/config.xml";
 
     public RsyncMover load(final String configPath) {

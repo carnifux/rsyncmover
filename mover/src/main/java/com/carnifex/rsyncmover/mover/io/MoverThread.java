@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 public class MoverThread extends Thread {
 
-    private static final Logger logger = LogManager.getLogger(MoverThread.class);
+    private static final Logger logger = LogManager.getLogger();
 
     private final BlockingQueue<PathObject> pathObjectQueue;
     private final Set<PosixFilePermission> filePermissions;

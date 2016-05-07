@@ -12,7 +12,7 @@ import java.net.Socket;
 
 public class Server extends Thread {
 
-    private static final Logger logger = LogManager.getLogger(Server.class);
+    private static final Logger logger = LogManager.getLogger();
 
     private final ServerSocket socket;
     private final Audit audit;

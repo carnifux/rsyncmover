@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 public class Ssh {
 
-    private static final Logger logger = LogManager.getLogger(Ssh.class);
+    private static final Logger logger = LogManager.getLogger();
 
     private final String server;
     private final int port;
@@ -28,7 +28,6 @@ public class Ssh {
     private final String pass;
     private final String hostKey;
     private final Set<PosixFilePermission> filePermissions;
-    private final SshClient client;
 
     public Ssh(final String server, final int port, final String remoteDirectory, final String remoteRealDirectory,
                final String user, final String pass, final String hostKey,
@@ -41,16 +40,7 @@ public class Ssh {
         this.pass = pass;
         this.hostKey = hostKey;
         this.filePermissions = filePermissions;
-        this.client = new SshClient();
         logger.info("Ssh client for server " + server + ":" + port + ", monitoring " + remoteDirectory + " successfully initialized");
-    }
-
-    public void shutdown() {
-        try {
-            this.client.close();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     public String getServerName() {
@@ -58,16 +48,13 @@ public class Ssh {
     }
 
     public List<String> listFiles() {
-        try {
-            client.connect();
-            final List<RemoteResourceInfo> ls = client.getSftp().ls(remoteDirectory);
+        try (final SFTPClient sftp = new SshClient().getSftp()) {
+            final List<RemoteResourceInfo> ls = sftp.ls(remoteDirectory);
             return ls.stream()
                     .map(RemoteResourceInfo::getName)
                     .collect(Collectors.toList());
         } catch (Exception e) {
             throw new RuntimeException(e);
-        } finally {
-            client.disconnect();
         }
     }
 
@@ -79,8 +66,7 @@ public class Ssh {
         if (files.isEmpty()) {
             return;
         }
-        client.connect();
-        try (final SFTPClient sftp = client.getSftp()){
+        try (final SFTPClient sftp = new SshClient().getSftp()) {
             for (final String file : files) {
                 final String source = remoteDirectory + file;
                 try {
@@ -106,8 +92,6 @@ public class Ssh {
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
-        } finally {
-            client.disconnect();
         }
     }
 
@@ -118,7 +102,16 @@ public class Ssh {
         public SshClient() {
             this.ssh = new SSHClient();
             try {
-                init();
+                try {
+                    ssh.loadKnownHosts();
+                } catch (IOException e) {
+                    logger.warn("Error loading known hosts, continuing");
+                }
+                if (hostKey != null) {
+                    ssh.addHostKeyVerifier(hostKey);
+                }
+                ssh.connect(server, port);
+                ssh.authPassword(user, pass);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -129,38 +122,6 @@ public class Ssh {
                 return ssh.newSFTPClient();
             } catch (IOException e) {
                 logger.error("Error creating new SFTP client", e);
-                throw new RuntimeException(e);
-            }
-        }
-
-        private void init() throws IOException {
-            try {
-                ssh.loadKnownHosts();
-            } catch (IOException e) {
-                logger.warn("Error loading known hosts, continuing");
-            }
-            if (hostKey != null) {
-                ssh.addHostKeyVerifier(hostKey);
-            }
-        }
-
-        public void connect() {
-            try {
-                ssh.connect(server, port);
-                ssh.authPassword(user, pass);
-            } catch (IOException e) {
-                final String msg = "Error connecting to " + user + "@" + server + ":" + port;
-                logger.error(msg, e);
-                throw new RuntimeException(e);
-            }
-        }
-
-        public void disconnect() {
-            try {
-                ssh.disconnect();
-            } catch (IOException e) {
-                final String msg = "Error disconnecting from " + user + "@" + server + ":" + port;
-                logger.error(msg, e);
                 throw new RuntimeException(e);
             }
         }

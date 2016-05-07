@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 
 public class Mover {
 
-    private static final Logger logger = LogManager.getLogger(Mover.class);
+    private static final Logger logger = LogManager.getLogger();
     private static final String DEFAULT_MOVE_OPERATION = "move";
 
     private final String name;

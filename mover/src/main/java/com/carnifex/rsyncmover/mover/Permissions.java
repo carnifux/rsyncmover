@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 
 public class Permissions {
 
-    private static final Logger logger = LogManager.getLogger(Permissions.class);
+    private static final Logger logger = LogManager.getLogger();
 
     private Permissions() {}
 

@@ -15,7 +15,7 @@ import java.util.Set;
 
 public abstract class MoveOperator {
 
-    protected static final Logger logger = LogManager.getLogger(MoveOperator.class);
+    protected static final Logger logger = LogManager.getLogger();
 
     protected abstract void operate(final Path from, final Path to) throws IOException;
     public abstract String getMethod();

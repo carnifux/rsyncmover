@@ -21,7 +21,7 @@ import java.util.stream.Stream;
 public class Emailer extends Thread {
 
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    private static final Logger logger = LogManager.getLogger(Emailer.class);
+    private static final Logger logger = LogManager.getLogger();
     private static final String emailContentType = "text/html; charset=utf-8";
     private final String to;
     private final String from;

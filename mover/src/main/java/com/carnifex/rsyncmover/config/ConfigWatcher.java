@@ -16,7 +16,7 @@ import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
 public class ConfigWatcher extends Thread {
 
-    private static final Logger logger = LogManager.getLogger(ConfigWatcher.class);
+    private static final Logger logger = LogManager.getLogger();
 
     private final String configPath;
     private final WatchService watcher;

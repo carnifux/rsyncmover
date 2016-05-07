@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 
 public class Syncer extends Thread {
 
-    private static final Logger logger = LogManager.getLogger(Syncer.class);
+    private static final Logger logger = LogManager.getLogger();
 
     private final List<String> dlDirs;
     private final SyncedFiles syncedFiles;

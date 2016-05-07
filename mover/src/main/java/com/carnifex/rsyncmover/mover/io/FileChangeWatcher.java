@@ -16,7 +16,7 @@ import java.util.stream.Stream;
 
 public class FileChangeWatcher extends Thread {
 
-    private static final Logger logger = LogManager.getLogger(FileChangeWatcher.class);
+    private static final Logger logger = LogManager.getLogger();
     private static final String DO_NOT_ADD_SUFFIX = ".filenamemovetest";
     private static final int UPDATE_INTERVAL = 10000;
 

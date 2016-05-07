@@ -3,6 +3,11 @@ package com.carnifex.rsyncmover.config;
 
 import com.carnifex.rsyncmover.beans.RsyncMover;
 import com.carnifex.rsyncmover.beans.RsyncMover.Servers.Server;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -16,11 +21,27 @@ import java.util.stream.Stream;
 
 public class Config {
 
+    private static final Logger logger = LogManager.getLogger();
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HHmm");
     private final RsyncMover config;
 
     public Config(final RsyncMover config) {
         this.config = config;
+        setLogLevel();
+    }
+
+    private void setLogLevel() {
+        if (config.getLogLevel() != null) {
+            try {
+                final LoggerContext context = (LoggerContext) LogManager.getContext(false);
+                final LoggerConfig loggerConfig = context.getConfiguration().getLoggerConfig(LogManager.ROOT_LOGGER_NAME);
+                loggerConfig.setLevel(Level.getLevel(config.getLogLevel().toUpperCase()));
+                context.updateLoggers();
+                logger.info("Set log level to " + config.getLogLevel());
+            } catch (Exception e) {
+                logger.error("Exception setting log level", e);
+            }
+        }
     }
 
     public List<String> getWatchDir() {
