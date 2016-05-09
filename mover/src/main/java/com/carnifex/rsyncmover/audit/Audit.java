@@ -24,7 +24,7 @@ public class Audit extends Thread {
     private static final String HEADERS = "HTTP/1.0 200 OK\r\nServer: rsyncMover\r\nContent-type: text/html\r\n" +
             "Content-length: %d\r\nConnection: close\r\n\r\n";
     private static final List<Type> types = Arrays.asList(ERROR, DUPLICATE, MOVED, DOWNLOADED, SEEN);
-    private static final long passivateInterval = 500 * 60; // 5 minutes
+    private static final long passivateInterval = 5 * 1000 * 60; // 5 minutes
     private static final Logger logger = LogManager.getLogger();
     private final Map<Type, Set<Entry>> allEntries;
     private final Map<Type, Set<Entry>> dailyEntries;
