@@ -2,6 +2,7 @@ package com.carnifex.rsyncmover.web;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -26,7 +27,7 @@ public class Server extends Thread {
         }
         this.audit = audit;
         logger.info("Web server successfully initialized on port " + port);
-        start();
+        this.start();
     }
 
     public void shutdown() {
@@ -36,7 +37,7 @@ public class Server extends Thread {
         } catch (IOException e) {
             final String msg = "Exception closing server socket on thread interruption";
             logger.error(msg, e);
-            audit.addError(msg, e);
+            audit.add(new ErrorEntry(msg, e));
         }
     }
 
@@ -52,7 +53,7 @@ public class Server extends Thread {
                 }
                 final String msg = "IOException from server socket";
                 logger.error(msg, e);
-                audit.addError(msg, e);
+                audit.add(new ErrorEntry(msg, e));
             }
         }
     }
@@ -69,22 +70,17 @@ public class Server extends Thread {
         @Override
         public void run() {
             logger.info("Request received from " + s.getInetAddress().toString() + ", sending audit summary");
+            final byte[] response = audit.formatAll().getBytes();
             try {
                 final OutputStream os = s.getOutputStream();
-                os.write(audit.formatAll().getBytes());
+                os.write(response);
                 os.flush();
                 // finish the output to make docker containers happy
                 s.shutdownOutput();
             } catch (IOException e) {
                 final String msg = "IOException from ServerThread socket";
                 logger.error(msg, e);
-                audit.addError(msg, e);
-            } finally {
-                try {
-                    s.close();
-                } catch (IOException e) {
-                    logger.info("Exception closing socket", e);
-                }
+                audit.add(new ErrorEntry(msg, e));
             }
         }
     }

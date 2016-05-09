@@ -45,7 +45,6 @@ public class Emailer extends Thread {
             this.properties.put("mail.smtp.port", "25");
             this.properties.put("mail.smtp.from", from);
             this.properties.put("mail.smtp.allow8bitmime", "true");
-            this.setDaemon(true);
         }
     }
 

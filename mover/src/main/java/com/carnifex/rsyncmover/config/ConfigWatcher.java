@@ -31,7 +31,6 @@ public class ConfigWatcher extends Thread {
         if (logger.isDebugEnabled()) {
             logger.debug("Previous config: " + previousConfig);
         }
-        this.setDaemon(true);
         try {
             this.watcher = FileSystems.getDefault().newWatchService();
             config.getParent().register(watcher, ENTRY_MODIFY, ENTRY_CREATE);

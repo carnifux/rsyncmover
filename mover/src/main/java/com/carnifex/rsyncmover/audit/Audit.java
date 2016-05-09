@@ -1,101 +1,181 @@
 package com.carnifex.rsyncmover.audit;
 
+import com.carnifex.rsyncmover.audit.entry.Entry;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.io.*;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
+
+import static com.carnifex.rsyncmover.audit.Type.*;
 
 
-public class Audit {
+public class Audit extends Thread {
 
-    private static final String HEADERS = "HTTP/1.0 200 OK\r\nServer: rsyncMover\r\nContent-type: text/html\r\n\r\n";
-    private final Set<String> duplicate;
-    private final Set<String> moved;
-    private final Set<String> downloaded;
-    private final Set<String> seen;
-    private final Set<String> error;
-    private final Set<String> duplicateAll;
-    private final Set<String> movedAll;
-    private final Set<String> downloadedAll;
-    private final Set<String> seenAll;
-    private final Set<String> errorAll;
+    private static final String HEADERS = "HTTP/1.0 200 OK\r\nServer: rsyncMover\r\nContent-type: text/html\r\n" +
+            "Content-length: %d\r\nConnection: close\r\n\r\n";
+    private static final List<Type> types = Arrays.asList(ERROR, DUPLICATE, MOVED, DOWNLOADED, SEEN);
+    private static final long passivateInterval = 500 * 60; // 5 minutes
+    private static final Logger logger = LogManager.getLogger();
+    private final Map<Type, Set<Entry>> allEntries;
+    private final Map<Type, Set<Entry>> dailyEntries;
     private final Lock lock;
     private final LocalDateTime startTime;
+    private final boolean passivate;
+    private final String passivateLocation;
     private volatile boolean locked;
+    private volatile long nextPassivate;
+    private volatile boolean needToPassivate;
+    private volatile boolean passivated;
+    private volatile boolean passivating;
 
-    public Audit() {
-        this.duplicate = new HashSet<>();
-        this.moved = new HashSet<>();
-        this.downloaded = new HashSet<>();
-        this.seen = new HashSet<>();
-        this.error = new HashSet<>();
-        this.duplicateAll = new HashSet<>();
-        this.movedAll = new HashSet<>();
-        this.downloadedAll = new HashSet<>();
-        this.seenAll = new HashSet<>();
-        this.errorAll = new HashSet<>();
+    public Audit(final boolean passivate, final String passivateLocation) {
+        super("AuditThread");
+        this.allEntries = new ConcurrentHashMap<>();
+        this.dailyEntries = new ConcurrentHashMap<>();
         this.lock = new ReentrantLock();
         this.locked = false;
         this.startTime = LocalDateTime.now();
+        this.passivate = passivate;
+        this.passivateLocation = passivateLocation;
+        this.needToPassivate = false;
+        this.passivated = true;
+        this.passivating = false;
+        if (passivate) {
+            this.start();
+        }
+        logger.info("Audit successfully initialised");
+    }
+
+    public void shutdown() {
+        passivate();
+        this.interrupt();
+    }
+
+    @Override
+    public void run() {
+        logger.info("Audit thread started, reading initial passivated file");
+        allEntries.putAll(readPassivatedFile());
+        for (;;) {
+            final long current = System.currentTimeMillis();
+            // within 30 seconds is close enough
+            if (needToPassivate && current - nextPassivate < 30 * 1000) {
+                logger.debug("Passivating audit");
+                passivate();
+            }
+            nextPassivate = System.currentTimeMillis() + passivateInterval;
+            try {
+                Thread.sleep(passivateInterval);
+            } catch (InterruptedException e) {
+                logger.debug("Interrupted", e);
+            }
+        }
+    }
+
+    private synchronized void passivate() {
+        logger.debug("Passivating audit");
+        lock.lock();
+        final Map<Type, Set<Entry>> map = readPassivatedFile();
+        if (!needToPassivate) {
+            return;
+        }
+        final int newSize = (int) map.values().stream().flatMap(Collection::stream).count();
+        final int oldSize = (int) allEntries.values().stream().flatMap(Collection::stream).count();
+        if (newSize != oldSize) {
+            map.putAll(allEntries);
+            FileOutputStream fileOut = null;
+            ObjectOutputStream out = null;
+            try {
+                fileOut = new FileOutputStream(passivateLocation, false);
+                out = new ObjectOutputStream(fileOut);
+                out.writeObject(map);
+                allEntries.clear();
+                logger.debug("Audit passivated - " + (oldSize - newSize) + " entries added to passivated location");
+            } catch (IOException e) {
+                final String msg = "Exception writing passivated entries";
+                logger.error(msg, e);
+                add(new ErrorEntry(msg, e));
+            } finally {
+                close(fileOut);
+                close(out);
+            }
+        }
+
+        needToPassivate = false;
+        passivated = true;
+        lock.unlock();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<Type, Set<Entry>> readPassivatedFile() {
+        final Map<Type, Set<Entry>> map = new HashMap<>();
+        if (passivated && new File(passivateLocation).exists()) {
+            FileInputStream fileIn = null;
+            ObjectInputStream in = null;
+            try {
+                fileIn = new FileInputStream(passivateLocation);
+                in = new ObjectInputStream(fileIn);
+                final Map<Type, Set<Entry>> fromFile = (Map<Type, Set<Entry>>) in.readObject();
+                map.putAll(fromFile);
+                in.close();
+                logger.debug("Read " + (int) allEntries.values().stream().flatMap(Collection::stream).count() + " passivated entries");
+            } catch (IOException | ClassNotFoundException e) {
+                final String msg = "Exception reading passivated entries";
+                logger.error(msg, e);
+                add(new ErrorEntry(msg, e));
+            } finally {
+                close(in);
+                close(fileIn);
+            }
+        }
+        return map;
+    }
+
+    private void close(final Closeable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                final String msg = "Exception closing closeable";
+                logger.error(msg, e);
+                add(new ErrorEntry(msg, e));
+            }
+        }
     }
 
     public String formatAll() {
-        final StringBuilder message = new StringBuilder(HEADERS);
+        allEntries.putAll(readPassivatedFile());
+        final StringBuilder message = new StringBuilder();
         message.append("<html><body>");
         message.append(makeUptime(startTime));
-        if (!errorAll.isEmpty()) {
-            message.append(makeTitle("ERRORS"));
-            message.append(makeContent(errorAll));
-        }
-        if (!movedAll.isEmpty()) {
-            message.append(makeTitle("MOVED"));
-            message.append(makeContent(movedAll));
-        }
-        if (!duplicateAll.isEmpty()) {
-            message.append(makeTitle("DELETED DUPLICATES"));
-            message.append(makeContent(duplicateAll));
-        }
-        if (!downloadedAll.isEmpty()) {
-            message.append(makeTitle("DOWNLOADED"));
-            message.append(makeContent(downloadedAll));
-        }
-        if (!seenAll.isEmpty()) {
-            message.append(makeTitle("SEEN"));
-            message.append(makeContent(seenAll));
+        for (Type type : types) {
+            if (allEntries.containsKey(type)) {
+                message.append(makeTitle(type));
+                message.append(makeContent(allEntries.get(type)));
+            }
         }
         message.append("</body></html>");
-        return message.toString();
+        return String.format(HEADERS, message.length()) + message.toString();
     }
 
     public String formatEmail() {
         final StringBuilder message = new StringBuilder();
         message.append("<html><body>");
         message.append(makeUptime(startTime));
-        if (!error.isEmpty()) {
-            message.append(makeTitle("ERRORS"));
-            message.append(makeContent(error));
-        }
-        if (!moved.isEmpty()) {
-            message.append(makeTitle("MOVED"));
-            message.append(makeContent(moved));
-        }
-        if (!duplicate.isEmpty()) {
-            message.append(makeTitle("DELETED DUPLICATES"));
-            message.append(makeContent(duplicate));
-        }
-        if (!downloaded.isEmpty()) {
-            message.append(makeTitle("DOWNLOADED"));
-            message.append(makeContent(downloaded));
-        }
-        if (!seen.isEmpty()) {
-            message.append(makeTitle("SEEN"));
-            message.append(makeContent(seen));
+        for (Type type : types) {
+            if (dailyEntries.containsKey(type)) {
+                message.append(makeTitle(type));
+                message.append(makeContent(dailyEntries.get(type)));
+            }
         }
         message.append("</body></html>");
         return message.toString();
@@ -130,12 +210,13 @@ public class Audit {
         return builder.append("<br /><br />").toString();
     }
 
-    private String makeContent(final Set<String> strings) {
-        return strings.stream().sorted().collect(Collectors.joining("<br />"));
+    private String makeContent(final Set<Entry> strings) {
+        return strings.stream().map(entry -> entry.getCreatedAt().toString() + ": " + entry.format())
+                .sorted().collect(Collectors.joining("<br />"));
     }
 
-    private String makeTitle(final String title) {
-        return "<br />================" + title + "================<br /><br />";
+    private String makeTitle(final Type type) {
+        return "<br />================" + type.toString() + "================<br /><br />";
     }
 
     public void accessing() {
@@ -150,50 +231,31 @@ public class Audit {
 
     public void clear() {
         if (locked && lock.tryLock()) {
-            duplicate.clear();
-            moved.clear();
-            downloaded.clear();
-            seen.clear();
-            error.clear();
+            dailyEntries.clear();
         }
     }
 
-    @SafeVarargs
-    private final void add(final String value, final Set<String>... sets) {
-        for (final Set<String> set : sets) {
-            set.add(value);
+    public void add(final Entry entry) {
+        if (!lock.tryLock()) {
+            lock.lock();
+        }
+        lock.unlock();
+        add(entry, dailyEntries);
+        final boolean addedToAll = add(entry, allEntries);
+        if (addedToAll) {
+            scheduleNextPassivate(System.currentTimeMillis());
         }
     }
 
-    public void addDuplicateDeletion(final String path) {
-        add(path, duplicate, duplicateAll);
-    }
-
-    public void addMoved(final String to, final String from, final String method) {
-        add(String.format("%s: %s -> %s", method, to, from), moved, movedAll);
-    }
-
-    public void addDownloaded(final String filename) {
-        add(filename, downloaded, downloadedAll);
-    }
-
-    public void addSeen(final String filename) {
-        add(filename, seen, seenAll);
-    }
-
-    public void addError(final String error) {
-        addError(error, null);
-    }
-
-    public void addError(final String e, final Throwable t) {
-        if (t == null) {
-            add(e, error, errorAll);
-            return;
+    private void scheduleNextPassivate(final long next) {
+        if (passivate) {
+            needToPassivate = true;
+            nextPassivate = next + passivateInterval;
+            logger.trace("Passivate scheduled");
         }
-        final String reduce = Stream.of(t.getStackTrace())
-                .map(t_ -> t_.toString() + "<br />")
-                .reduce("", (a, b) -> a + b);
-        add(e + "<br />" + reduce, error, errorAll);
     }
 
+    private boolean add(final Entry entry, final Map<Type, Set<Entry>> map) {
+        return map.computeIfAbsent(entry.getType(), ignore -> new HashSet<>()).add(entry);
+    }
 }

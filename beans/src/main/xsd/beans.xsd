@@ -254,6 +254,14 @@
                         </xs:sequence>
                     </xs:complexType>
                 </xs:element>
+                <xs:element name="audit">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element type="xs:boolean" name="passivate" />
+                            <xs:element type="xs:string" name="passivateLocation" />
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
                 <xs:element name="webServer">
                     <xs:complexType>
                         <xs:sequence>

@@ -33,7 +33,6 @@ public class FileChangeWatcher extends Thread {
         this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         this.movers = movers;
         this.moverThread = moverThread;
-        this.setDaemon(true);
         this.start();
         logger.info("File change watcher successfully initialized");
     }

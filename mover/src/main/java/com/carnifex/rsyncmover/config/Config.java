@@ -89,6 +89,14 @@ public class Config {
         return permissions != null ? PosixFilePermissions.fromString(permissions) : null;
     }
 
+    public boolean shouldPassivateAudit() {
+        return config.getAudit().isPassivate();
+    }
+
+    public String getAuditPassivateLocation() {
+        return config.getAudit().getPassivateLocation();
+    }
+
     public boolean getDeleteDuplicateFiles() {
         return config.getMovers().isDeleteDuplicateFiles();
     }

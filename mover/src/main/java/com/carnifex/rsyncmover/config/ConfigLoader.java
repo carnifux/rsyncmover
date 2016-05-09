@@ -41,6 +41,9 @@ public class ConfigLoader {
             if (mover.getWebServer() == null) {
                 mover.setWebServer(new RsyncMover.WebServer());
             }
+            if (mover.getAudit() == null) {
+                mover.setAudit(new RsyncMover.Audit());
+            }
             if (mover.getMovers().isUseDefaultMatching()) {
                 updateMover(mover, loadBase());
             }

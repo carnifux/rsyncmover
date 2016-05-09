@@ -18,11 +18,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class RsyncMover {
 
@@ -31,17 +30,23 @@ public class RsyncMover {
 
 
     public static void main(String[] args) {
-        // audit will not be reinitialised, so init here
-        final Audit audit = new Audit();
-        components.put(Audit.class, audit);
         final String configPath = args != null && args.length > 0 ? args[0] : "config.xml";
-        init(configPath);
+        final Config config = new Config(new ConfigLoader().load(configPath));
+        // audit will not be reinitialised, so init here
+        final Audit audit = new Audit(config.shouldPassivateAudit(), config.getAuditPassivateLocation());
+        components.put(Audit.class, audit);
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                audit.shutdown();
+            }
+        });
+        init(config);
         final ConfigWatcher configWatcher = new ConfigWatcher(configPath);
         components.put(ConfigWatcher.class, configWatcher);
     }
 
-    public static synchronized void init(final String configPath) {
-        final Config config = new Config(new ConfigLoader().load(configPath));
+    public static synchronized void init(final Config config) {
         final Audit audit = (Audit) components.get(Audit.class);
         final List<Emailer> emailers = config.getEmailSendTime().stream()
                 .map(time -> new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(), config.getEmail().getFrom(), time, audit))
@@ -94,7 +99,7 @@ public class RsyncMover {
 
     public static synchronized void reinit(final String configPath) {
         shutdownAll();
-        init(configPath);
+        init(new Config(new ConfigLoader().load(configPath)));
     }
 
     @SuppressWarnings("unchecked")
@@ -131,9 +136,8 @@ public class RsyncMover {
     }
 
     private static List<FileWatcher> initFileWatchers(final Config config, final MoverThread moverThread, final FileChangeWatcher fileChangeWatcher) {
-        final String passivateLocation = config.getPassivateLocation();
         final List<FileWatcher> watchers = config.getWatchDir().stream().map(watch -> new FileWatcher(watch,
-                passivateLocation != null ? Collections.singleton(passivateLocation) : Collections.emptySet(),
+                asSet(config.getPassivateLocation(), config.getAuditPassivateLocation()),
                 fileChangeWatcher)).collect(Collectors.toList());
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
@@ -161,4 +165,7 @@ public class RsyncMover {
         return syncer;
     }
 
+    private static Set<String> asSet(final String... strings) {
+        return Stream.of(strings).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
 }

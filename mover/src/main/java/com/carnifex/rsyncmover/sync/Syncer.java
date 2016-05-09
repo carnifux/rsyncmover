@@ -2,6 +2,9 @@ package com.carnifex.rsyncmover.sync;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.DownloadedEntry;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import com.carnifex.rsyncmover.audit.entry.SeenEntry;
 import com.carnifex.rsyncmover.mover.io.Mover;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -59,7 +62,7 @@ public class Syncer extends Thread {
                 final List<String> allFiles = ssh.listFiles();
                 logger.debug("Received following files from ssh: " + allFiles.stream().map(this::normalize).collect(Collectors.joining(", ")));
                 final List<String> shouldDownload = allFiles.stream()
-                        .peek(file -> audit.addSeen(normalize(file)))
+                        .peek(file -> audit.add(new SeenEntry(normalize(file), ssh.getServerName())))
                         .filter(file -> syncedFiles.shouldDownload(ssh.getServerName(), normalize(file)))
                         .filter(file -> {
                             final boolean result = this.movers.isEmpty() || this.movers.stream().filter(mover -> mover.shouldSubmit(Paths.get(file))).count() == 1;
@@ -83,17 +86,17 @@ public class Syncer extends Thread {
                             } catch (Exception e) {
                                 final String msg = "Error setting file permissions on downloaded files";
                                 logger.error(msg, e);
-                                audit.addError(msg, e);
+                                audit.add(new ErrorEntry(msg, e));
                             }
                         }
                         syncedFiles.addDownloadedPath(ssh.getServerName(), normalize(path));
-                        audit.addDownloaded(path);
+                        audit.add(new DownloadedEntry(path, ssh.getServerName()));
                     });
                 }
             } catch (Exception e) {
                 final String msg = "Exception downloading or listing files";
                 logger.error(msg, e);
-                audit.addError(msg, e);
+                audit.add(new ErrorEntry(msg, e));
             }
         }
         logger.debug("Finished downloading new files");

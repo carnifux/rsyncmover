@@ -2,6 +2,9 @@ package com.carnifex.rsyncmover.mover.io;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.DuplicateEntry;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import com.carnifex.rsyncmover.audit.entry.MovedEntry;
 import com.carnifex.rsyncmover.mover.Permissions;
 import com.carnifex.rsyncmover.mover.operators.MoveOperator;
 import org.apache.commons.io.FileUtils;
@@ -88,17 +91,17 @@ public class MoverThread extends Thread {
                 } else {
                     Files.delete(pathObject.getTo());
                 }
-                audit.addDuplicateDeletion(pathObject.getTo().toString());
+                audit.add(new DuplicateEntry(pathObject.getTo().toString()));
             }
             pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions);
-            audit.addMoved(pathObject.getFrom().toString(), pathObject.getTo().toString(), pathObject.getOperator().getMethod());
+            audit.add(new MovedEntry(pathObject.getFrom().toString(), pathObject.getTo().toString(), pathObject.getOperator().getMethod()));
             if (filePermissions != null && pathObject.getOperator().shouldSetFilePermissions()) {
                 Permissions.setPermissions(pathObject.getTo(), filePermissions);
             }
         } catch (Exception e) {
             final String s = "Error moving from " + pathObject.getFrom().toString() + " to " + pathObject.getTo().toString();
             logger.error(s, e);
-            audit.addError(s, e);
+            audit.add(new ErrorEntry(s, e));
         }
     }
 
