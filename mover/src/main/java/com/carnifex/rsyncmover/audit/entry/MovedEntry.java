@@ -7,7 +7,7 @@ import static com.carnifex.rsyncmover.audit.Type.MOVED;
 
 public class MovedEntry extends Entry {
 
-    private static final String PATH_SEPARATOR = File.separator.equals("\\") ? "\\\\" : "\\";
+    private static final String PATH_SEPARATOR = File.separator.equals("\\") ? "\\\\" : File.separator;
     private final String from;
     private final String to;
     private final String operation;

@@ -36,7 +36,6 @@ public class Audit extends Thread {
     private volatile long nextPassivate;
     private volatile boolean needToPassivate;
     private volatile boolean passivated;
-    private volatile boolean passivating;
 
     public Audit(final boolean passivate, final String passivateLocation) {
         super("AuditThread");
@@ -49,7 +48,6 @@ public class Audit extends Thread {
         this.passivateLocation = passivateLocation;
         this.needToPassivate = false;
         this.passivated = true;
-        this.passivating = false;
         if (passivate) {
             this.start();
         }
@@ -153,7 +151,8 @@ public class Audit extends Thread {
     }
 
     public String formatAll() {
-        allEntries.putAll(readPassivatedFile());
+        readPassivatedFile().forEach((type, set) -> allEntries
+                .computeIfAbsent(type, ignore -> new HashSet<>()).addAll(set));
         final StringBuilder message = new StringBuilder();
         message.append("<html><body>");
         message.append(makeUptime(startTime));
@@ -230,21 +229,19 @@ public class Audit extends Thread {
     }
 
     public void clear() {
-        if (locked && lock.tryLock()) {
+        if (locked) {
             dailyEntries.clear();
         }
     }
 
     public void add(final Entry entry) {
-        if (!lock.tryLock()) {
-            lock.lock();
-        }
-        lock.unlock();
+        lock.lock();
         add(entry, dailyEntries);
         final boolean addedToAll = add(entry, allEntries);
         if (addedToAll) {
             scheduleNextPassivate(System.currentTimeMillis());
         }
+        lock.unlock();
     }
 
     private void scheduleNextPassivate(final long next) {
