@@ -89,7 +89,7 @@ public class Audit extends Thread {
         final int newSize = (int) map.values().stream().flatMap(Collection::stream).count();
         final int oldSize = (int) allEntries.values().stream().flatMap(Collection::stream).count();
         if (newSize != oldSize) {
-            map.putAll(allEntries);
+            map.forEach((type, set) -> allEntries.computeIfAbsent(type, ignore -> new HashSet<>()).addAll(set));
             FileOutputStream fileOut = null;
             ObjectOutputStream out = null;
             try {
