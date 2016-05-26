@@ -1,5 +1,5 @@
 FROM phusion/baseimage:0.9.11
-MAINTAINER carnifux <carnifux@gmail.com>
+MAINTAINER carnifex <carnifex266@gmail.com>
 ENV DEBIAN_FRONTEND noninteractive
 
 # Set correct environment variables.
@@ -31,8 +31,5 @@ ENV LANG en_US.UTF-8
 
 RUN usermod -u 99 nobody
 RUN usermod -g 100 nobody
-    
-ADD config.xml /config.xml
-ADD rsyncMoverMover-0.1-SNAPSHOT-jar-with-dependencies.jar /rsyncMover.jar
 
-ENTRYPOINT ["java", "-jar", "/rsyncMover.jar", "/config.xml"]
+ADD rsyncMoverMover-0.1-SNAPSHOT-jar-with-dependencies.jar /rsyncMover.jar

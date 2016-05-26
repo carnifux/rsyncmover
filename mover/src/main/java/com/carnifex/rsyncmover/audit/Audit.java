@@ -37,10 +37,16 @@ public class Audit extends Thread {
     private volatile boolean needToPassivate;
     private volatile boolean passivated;
 
-    public Audit(final boolean passivate, final String passivateLocation) {
+    public Audit(final boolean passivate, final String passivateLocation, final Audit old) {
         super("AuditThread");
-        this.allEntries = new ConcurrentHashMap<>();
-        this.dailyEntries = new ConcurrentHashMap<>();
+        if (old == null) {
+            this.allEntries = new ConcurrentHashMap<>();
+            this.dailyEntries = new ConcurrentHashMap<>();
+        } else {
+            this.allEntries = old.allEntries;
+            this.dailyEntries = old.dailyEntries;
+            old.shutdown();
+        }
         this.lock = new ReentrantLock();
         this.locked = false;
         this.startTime = LocalDateTime.now();
@@ -62,12 +68,11 @@ public class Audit extends Thread {
     @Override
     public void run() {
         logger.info("Audit thread started, reading initial passivated file");
-        allEntries.putAll(readPassivatedFile());
+        addEntriesToMap(readPassivatedFile(), allEntries);
         for (;;) {
             final long current = System.currentTimeMillis();
             // within 30 seconds is close enough
             if (needToPassivate && current - nextPassivate < 30 * 1000) {
-                logger.debug("Passivating audit");
                 passivate();
             }
             nextPassivate = System.currentTimeMillis() + passivateInterval;
@@ -75,21 +80,23 @@ public class Audit extends Thread {
                 Thread.sleep(passivateInterval);
             } catch (InterruptedException e) {
                 logger.debug("Interrupted", e);
+                break;
             }
         }
     }
 
     private synchronized void passivate() {
+        if (!passivate || !needToPassivate) {
+            logger.debug("No need to passivate audit, returning");
+            return;
+        }
         logger.debug("Passivating audit");
         lock.lock();
         final Map<Type, Set<Entry>> map = readPassivatedFile();
-        if (!needToPassivate) {
-            return;
-        }
         final int newSize = (int) map.values().stream().flatMap(Collection::stream).count();
         final int oldSize = (int) allEntries.values().stream().flatMap(Collection::stream).count();
         if (newSize != oldSize) {
-            map.forEach((type, set) -> allEntries.computeIfAbsent(type, ignore -> new HashSet<>()).addAll(set));
+            addEntriesToMap(allEntries, map);
             FileOutputStream fileOut = null;
             ObjectOutputStream out = null;
             try {
@@ -113,10 +120,14 @@ public class Audit extends Thread {
         lock.unlock();
     }
 
+    private void addEntriesToMap(final Map<Type, Set<Entry>> newMap, final Map<Type, Set<Entry>> mapToAddTo) {
+        newMap.forEach((type, set) -> mapToAddTo.computeIfAbsent(type, ignore -> new HashSet<>()).addAll(set));
+    }
+
     @SuppressWarnings("unchecked")
     private Map<Type, Set<Entry>> readPassivatedFile() {
         final Map<Type, Set<Entry>> map = new HashMap<>();
-        if (passivated && new File(passivateLocation).exists()) {
+        if (passivate && passivated && new File(passivateLocation).exists()) {
             FileInputStream fileIn = null;
             ObjectInputStream in = null;
             try {
@@ -125,6 +136,7 @@ public class Audit extends Thread {
                 final Map<Type, Set<Entry>> fromFile = (Map<Type, Set<Entry>>) in.readObject();
                 map.putAll(fromFile);
                 in.close();
+                passivated = false;
                 logger.debug("Read " + (int) allEntries.values().stream().flatMap(Collection::stream).count() + " passivated entries");
             } catch (IOException | ClassNotFoundException e) {
                 final String msg = "Exception reading passivated entries";
@@ -134,6 +146,7 @@ public class Audit extends Thread {
                 close(in);
                 close(fileIn);
             }
+            needToPassivate = true;
         }
         return map;
     }
@@ -151,8 +164,7 @@ public class Audit extends Thread {
     }
 
     public String formatAll() {
-        readPassivatedFile().forEach((type, set) -> allEntries
-                .computeIfAbsent(type, ignore -> new HashSet<>()).addAll(set));
+        addEntriesToMap(readPassivatedFile(), allEntries);
         final StringBuilder message = new StringBuilder();
         message.append("<html><body>");
         message.append(makeUptime(startTime));
@@ -211,7 +223,7 @@ public class Audit extends Thread {
 
     private String makeContent(final Set<Entry> strings) {
         return strings.stream().map(entry -> entry.getCreatedAt().toString() + ": " + entry.format())
-                .sorted().collect(Collectors.joining("<br />"));
+                .sorted(Comparator.reverseOrder()).collect(Collectors.joining("<br />"));
     }
 
     private String makeTitle(final Type type) {
@@ -245,7 +257,7 @@ public class Audit extends Thread {
     }
 
     private void scheduleNextPassivate(final long next) {
-        if (passivate) {
+        if (passivate && !needToPassivate) {
             needToPassivate = true;
             nextPassivate = next + passivateInterval;
             logger.trace("Passivate scheduled");

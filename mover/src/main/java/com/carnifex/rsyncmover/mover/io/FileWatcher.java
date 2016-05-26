@@ -1,17 +1,14 @@
 package com.carnifex.rsyncmover.mover.io;
 
 
+import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
+import java.nio.file.*;
 import java.util.Set;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
@@ -25,14 +22,18 @@ public class FileWatcher extends Thread {
     private final WatchService watcher;
     private final Set<String> dontWatch;
     private final FileChangeWatcher fileChangeWatcher;
+    private final Audit audit;
 
-    public FileWatcher(final String dir, final Set<String> dontWatch, final FileChangeWatcher fileChangeWatcher) {
+    public FileWatcher(final String dir, final Set<String> dontWatch, final FileChangeWatcher fileChangeWatcher, final Audit audit) {
         super("FileWatcher - " + dir);
         this.dir = Paths.get(dir);
         this.dontWatch = dontWatch;
         this.fileChangeWatcher = fileChangeWatcher;
+        this.audit = audit;
         if (!this.dir.toFile().exists() || !this.dir.toFile().canRead()) {
-            logger.error("Watch folder " + dir + " does not exist or is unreadable, will not be watched");
+            final String msg = "Watch folder " + dir + " does not exist or is unreadable, will not be watched";
+            logger.error(msg);
+            audit.add(new ErrorEntry(msg, null));
             watcher = null;
         } else {
             try {
@@ -80,6 +81,9 @@ public class FileWatcher extends Thread {
 
 
             if (!key.reset()) {
+                final String msg = "FileWatcher key reset, folder no longer watchable";
+                logger.error(msg);
+                audit.add(new ErrorEntry(msg, null));
                 break;
             }
         }

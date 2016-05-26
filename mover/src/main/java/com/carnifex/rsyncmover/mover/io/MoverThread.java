@@ -54,6 +54,7 @@ public class MoverThread extends Thread {
                 }
             } catch (InterruptedException e) {
                 logger.debug("MoverThread interrupted", e);
+                return;
             } finally {
                 moving = false;
             }
@@ -73,7 +74,7 @@ public class MoverThread extends Thread {
                 }
             }
         }
-
+        this.interrupt();
     }
 
     public void submit(final Path from, final Path to, final MoveOperator operator) {

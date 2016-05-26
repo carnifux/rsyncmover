@@ -19,27 +19,23 @@ public class ErrorEntry extends Entry {
 
     @Override
     public String format() {
+        if (throwable == null) {
+            return message;
+        }
         final StringWriter stringWriter = new StringWriter();
         throwable.printStackTrace(new PrintWriter(stringWriter));
-        return message + "\n" + stringWriter.toString();
+        // printwriter doesn't give us new lines
+        return message + "\n" + stringWriter.toString().replace("\n", "<br />");
     }
 
     @Override
     public boolean equals(final Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        final ErrorEntry that = (ErrorEntry) o;
-
-        if (!throwable.equals(that.throwable)) return false;
-        return message.equals(that.message);
-
+        // override the set behaviour, we want to keep each and every error
+        return false;
     }
 
     @Override
     public int hashCode() {
-        int result = throwable.hashCode();
-        result = 31 * result + message.hashCode();
-        return result;
+        return 0;
     }
 }

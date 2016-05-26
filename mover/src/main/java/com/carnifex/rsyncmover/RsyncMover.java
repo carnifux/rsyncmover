@@ -32,8 +32,14 @@ public class RsyncMover {
     public static void main(String[] args) {
         final String configPath = args != null && args.length > 0 ? args[0] : "config.xml";
         final Config config = new Config(new ConfigLoader().load(configPath));
+        init(config);
+        final ConfigWatcher configWatcher = new ConfigWatcher(configPath);
+        components.put(ConfigWatcher.class, configWatcher);
+    }
+
+    public static synchronized void init(final Config config) {
         // audit will not be reinitialised, so init here
-        final Audit audit = new Audit(config.shouldPassivateAudit(), config.getAuditPassivateLocation());
+        final Audit audit = new Audit(config.shouldPassivateAudit(), config.getAuditPassivateLocation(), (Audit) components.get(Audit.class));
         components.put(Audit.class, audit);
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
@@ -41,13 +47,6 @@ public class RsyncMover {
                 audit.shutdown();
             }
         });
-        init(config);
-        final ConfigWatcher configWatcher = new ConfigWatcher(configPath);
-        components.put(ConfigWatcher.class, configWatcher);
-    }
-
-    public static synchronized void init(final Config config) {
-        final Audit audit = (Audit) components.get(Audit.class);
         final List<Emailer> emailers = config.getEmailSendTime().stream()
                 .map(time -> new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(), config.getEmail().getFrom(), time, audit))
                 .collect(Collectors.toList());
@@ -57,7 +56,7 @@ public class RsyncMover {
         if (config.moveFiles()) {
             final MoverThread moverThread = initMoverThread(config, audit);
             final FileChangeWatcher fileChangeWatcher = initFileChangeWatcher(movers, moverThread);
-            final List<FileWatcher> fileWatchers = initFileWatchers(config, moverThread, fileChangeWatcher);
+            final List<FileWatcher> fileWatchers = initFileWatchers(config, moverThread, fileChangeWatcher, audit);
             components.putIfAbsent(FileChangeWatcher.class, fileChangeWatcher);
             components.putIfAbsent(MoverThread.class, moverThread);
             components.putIfAbsent(FileWatcher.class, fileWatchers);
@@ -135,10 +134,10 @@ public class RsyncMover {
         return new MoverThread(config.getFilePermissions(), config.getDeleteDuplicateFiles(), audit);
     }
 
-    private static List<FileWatcher> initFileWatchers(final Config config, final MoverThread moverThread, final FileChangeWatcher fileChangeWatcher) {
+    private static List<FileWatcher> initFileWatchers(final Config config, final MoverThread moverThread, final FileChangeWatcher fileChangeWatcher, final Audit audit) {
         final List<FileWatcher> watchers = config.getWatchDir().stream().map(watch -> new FileWatcher(watch,
                 asSet(config.getPassivateLocation(), config.getAuditPassivateLocation()),
-                fileChangeWatcher)).collect(Collectors.toList());
+                fileChangeWatcher, audit)).collect(Collectors.toList());
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
