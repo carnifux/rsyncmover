@@ -74,12 +74,14 @@ public class FileChangeWatcher extends Thread {
                             .collect(Collectors.toList());
                     if (movers.size() == 0) {
                         logger.error("Unable to find mover for file " + holder.get().toString());
-                    } else if (movers.size() > 1) {
-                        logger.error("Found multiple movers for file " + holder.get().toString() + "; not moving");
                     } else {
-                        final Mover mover = movers.get(0);
-                        final Path target = mover.getTarget(holder.get());
-                        moverThread.submit(holder.get(), target, mover.getMoveOperator());
+                        final Mover mover = chooseMover(movers);
+                        if (mover != null) {
+                            final Path target = mover.getTarget(holder.get());
+                            moverThread.submit(holder.get(), target, mover.getMoveOperator());
+                        } else {
+                            logger.error("Found multiple movers for file " + holder.get().toString() + "; not moving");
+                        }
                     }
                     iterator.remove();
                 }
@@ -93,6 +95,18 @@ public class FileChangeWatcher extends Thread {
 
         }
         logger.trace("Pending files: " + filesToMoveSoon.size());
+    }
+
+    private Mover chooseMover(final List<Mover> movers) {
+        if (movers.size() == 1) {
+            return movers.get(0);
+        }
+        final List<Mover> priorities = movers.stream().sorted((a, b) -> b.getPriority() - a.getPriority()).collect(Collectors.toList());
+        // if one has a higher priority than any of the others, then return that, otherwise we can't decide on a mover
+        if (priorities.get(0).getPriority() > priorities.get(1).getPriority()) {
+            return priorities.get(0);
+        }
+        return null;
     }
 
     private final class PathHolder {

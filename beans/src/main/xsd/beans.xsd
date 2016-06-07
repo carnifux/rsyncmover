@@ -46,6 +46,7 @@
                                 </xs:annotation>
                                 <xs:complexType>
                                     <xs:sequence>
+                                        <xs:element type="xs:int" name="priority" minOccurs="0" default="0"></xs:element>
                                         <xs:element type="xs:string" name="name" minOccurs="0">
                                             <xs:annotation>
                                                 <xs:documentation>names exist only to extend pre-defined groups, can be duplicated</xs:documentation>
@@ -114,6 +115,13 @@
                                             </xs:annotation>
                                         </xs:element>
                                         <xs:element type="xs:string" name="moveOperation" minOccurs="0"></xs:element>
+                                        <xs:element name="additionalArguments" minOccurs="0">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element type="xs:string" name="arg" maxOccurs="unbounded" minOccurs="0"/>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
                                     </xs:sequence>
                                 </xs:complexType>
                             </xs:element>

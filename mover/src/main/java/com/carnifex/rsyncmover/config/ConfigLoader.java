@@ -3,6 +3,7 @@ package com.carnifex.rsyncmover.config;
 
 import com.carnifex.rsyncmover.beans.RsyncMover;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover;
+import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.AdditionalArguments;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.DontMatchPatterns;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.Extensions;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.Patterns;
@@ -14,8 +15,8 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class ConfigLoader {
@@ -31,6 +32,11 @@ public class ConfigLoader {
             // make config null safe
             if (mover.getMovers() == null) {
                 mover.setMovers(new RsyncMover.Movers());
+            }
+            for (Mover m : mover.getMovers().getMover()) {
+                if (m.getAdditionalArguments() == null) {
+                    m.setAdditionalArguments(new AdditionalArguments());
+                }
             }
             if (mover.getServers() == null) {
                 mover.setServers(new RsyncMover.Servers());
@@ -54,39 +60,40 @@ public class ConfigLoader {
     }
 
     private void updateMover(final RsyncMover current, final RsyncMover defaultMover) {
-        final Map<String, Mover> moversByName = current.getMovers().getMover().stream()
-                .collect(Collectors.toMap(Mover::getName, Function.identity()));
+        final Map<String, List<Mover>> moversByName = current.getMovers().getMover().stream()
+                .collect(Collectors.groupingBy(Mover::getName));
         for (final Mover mover : defaultMover.getMovers().getMover()) {
-            final Mover other = moversByName.get(mover.getName());
-            if (other != null) {
-                other.setPartialMatch(mover.isPartialMatch());
-                if (mover.getPatterns() != null) {
-                    for (final String s : mover.getPatterns().getPattern()) {
-                        if (other.getPatterns() == null) {
-                            other.setPatterns(new Patterns());
-                        }
-                        if (!other.getPatterns().getPattern().contains(s)) {
-                            other.getPatterns().getPattern().add(s);
-                        }
-                    }
-                }
-                if (mover.getExtensions() != null) {
-                    for (final String s : mover.getExtensions().getExtension()) {
-                        if (other.getExtensions() == null) {
-                            other.setExtensions(new Extensions());
-                        }
-                        if (!other.getExtensions().getExtension().contains(s)) {
-                            other.getExtensions().getExtension().add(s);
+            for (Mover other : moversByName.get(mover.getName())) {
+                if (other != null) {
+                    other.setPartialMatch(mover.isPartialMatch());
+                    if (mover.getPatterns() != null) {
+                        for (final String s : mover.getPatterns().getPattern()) {
+                            if (other.getPatterns() == null) {
+                                other.setPatterns(new Patterns());
+                            }
+                            if (!other.getPatterns().getPattern().contains(s)) {
+                                other.getPatterns().getPattern().add(s);
+                            }
                         }
                     }
-                }
-                if (mover.getDontMatchPatterns() != null) {
-                    for (final String s : mover.getDontMatchPatterns().getPattern()) {
-                        if (other.getDontMatchPatterns() == null) {
-                            other.setDontMatchPatterns(new DontMatchPatterns());
+                    if (mover.getExtensions() != null) {
+                        for (final String s : mover.getExtensions().getExtension()) {
+                            if (other.getExtensions() == null) {
+                                other.setExtensions(new Extensions());
+                            }
+                            if (!other.getExtensions().getExtension().contains(s)) {
+                                other.getExtensions().getExtension().add(s);
+                            }
                         }
-                        if (!other.getDontMatchPatterns().getPattern().contains(s)) {
-                            other.getDontMatchPatterns().getPattern().add(s);
+                    }
+                    if (mover.getDontMatchPatterns() != null) {
+                        for (final String s : mover.getDontMatchPatterns().getPattern()) {
+                            if (other.getDontMatchPatterns() == null) {
+                                other.setDontMatchPatterns(new DontMatchPatterns());
+                            }
+                            if (!other.getDontMatchPatterns().getPattern().contains(s)) {
+                                other.getDontMatchPatterns().getPattern().add(s);
+                            }
                         }
                     }
                 }

@@ -24,6 +24,7 @@ public class Mover {
 
     private static final Logger logger = LogManager.getLogger();
     private static final String DEFAULT_MOVE_OPERATION = "move";
+    private static final int DEFAULT_PRIORITY = 0;
 
     private final String name;
     private final List<Pattern> patterns;
@@ -32,6 +33,7 @@ public class Mover {
     private final boolean partialMatch;
     private final Target target;
     private final MoveOperator operator;
+    private final int priority;
 
     public Mover(final com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover mover) {
         this.name = mover.getName();
@@ -42,7 +44,9 @@ public class Mover {
         this.extensions = mover.getExtensions() != null ? mover.getExtensions().getExtension().stream().map(String::toLowerCase).collect(Collectors.toList()) : Collections.emptyList();
         this.partialMatch = mover.isPartialMatch() != null ? mover.isPartialMatch() : false;
         this.target = new Target(mover.getTargetDirectory());
-        this.operator = MoveOperator.create(mover.getMoveOperation() != null ? mover.getMoveOperation() : DEFAULT_MOVE_OPERATION);
+        this.operator = MoveOperator.create(mover.getMoveOperation() != null ? mover.getMoveOperation() : DEFAULT_MOVE_OPERATION,
+                mover.getAdditionalArguments() != null ? mover.getAdditionalArguments().getArg() : Collections.emptyList());
+        this.priority = mover.getPriority() != null ? mover.getPriority() : DEFAULT_PRIORITY;
         logger.info("Mover for target directory " + target.partialPaths.stream().collect(Collectors.joining()) + " with move operation " + operator.getMethod() + " successfully initialized");
     }
 
@@ -73,6 +77,10 @@ public class Mover {
 
     public MoveOperator getMoveOperator() {
         return operator;
+    }
+
+    public int getPriority() {
+        return priority;
     }
 
     private static final class Target {

@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 public abstract class MoveOperator {
@@ -45,7 +46,6 @@ public abstract class MoveOperator {
         log(to);
     }
 
-
     private void log(final Path path) {
         logger.info("Finished moving " + path);
         final String message = LocalDateTime.now().toString() + " " + path.getFileName() + "\n";
@@ -56,7 +56,7 @@ public abstract class MoveOperator {
         }
     }
 
-    public static MoveOperator create(final String value)  {
+    public static MoveOperator create(final String value, final List<String> additionalArguments)  {
         switch (value) {
             case "move":
                 return new Move();
@@ -66,6 +66,8 @@ public abstract class MoveOperator {
                 return new Symlink();
             case "move+symlink":
                 return new MoveSymlink();
+            case "filebot":
+                return new FileBot(additionalArguments);
             default:
                 return new NoOp();
         }
