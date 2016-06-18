@@ -9,7 +9,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -21,6 +25,7 @@ public class SyncedFiles {
     private volatile Map<String, Set<String>> synced;
     private final Path passivateLocation;
     private volatile boolean passive;
+    private final boolean active;
 
     public SyncedFiles(final Path passivateLocation) {
         this.synced = new ConcurrentHashMap<>();
@@ -32,18 +37,31 @@ public class SyncedFiles {
                 create = file.createNewFile();
             } catch (IOException ignore) {}
             if (!create) {
-                throw new IllegalStateException("Passivating file does not exist and could not be created");
+                logger.error("Could not create passivate file, will not function");
+                this.active = false;
+                this.passive = false;
+            } else {
+                this.active = true;
+                this.passive = true;
             }
+        } else {
+            this.active = true;
+            this.passive = true;
         }
-        passive = true;
     }
 
     public boolean shouldDownload(final String serverName, final String path) {
+        if (!active) {
+            return true;
+        }
         depassivate();
         return !synced.getOrDefault(serverName, Collections.emptySet()).contains(path);
     }
 
     public void addDownloadedPath(final String serverName, final String path) {
+        if (!active) {
+            return;
+        }
         depassivate();
         synced.computeIfAbsent(serverName, ignore -> new HashSet<>()).add(path);
     }
@@ -53,10 +71,7 @@ public class SyncedFiles {
     }
 
     private void passivate() {
-        if (passive) {
-            return;
-        }
-        if (!passive) {
+        if (!passive && active) {
             synchronized (this) {
                 if (!passive) {
                     if (logger.isDebugEnabled()) {
@@ -77,7 +92,7 @@ public class SyncedFiles {
     }
 
     private void depassivate() {
-        if (passive) {
+        if (passive && active) {
             synchronized (this) {
                 if (passive) {
                     try {

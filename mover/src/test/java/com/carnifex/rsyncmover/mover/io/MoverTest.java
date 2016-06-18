@@ -20,7 +20,7 @@ public class MoverTest {
         final Movers.Mover mover = new Movers.Mover();
         mover.setPartialMatch(true);
         mover.setTargetDirectory("/dir");
-        assertEquals(Paths.get("/dir/test"), new Mover(mover).getTarget(Paths.get(simplePath)));
+        assertEquals(Paths.get("/dir/test"), new Mover(mover, null).getTarget(Paths.get(simplePath)));
     }
 
     @Test
@@ -29,7 +29,7 @@ public class MoverTest {
         final Movers.Mover mover = new Movers.Mover();
         mover.setPartialMatch(true);
         mover.setTargetDirectory("D:\\dir\\");
-        assertEquals(Paths.get("D:\\dir\\test"), new Mover(mover).getTarget(Paths.get(simplePath)));
+        assertEquals(Paths.get("D:\\dir\\test"), new Mover(mover, null).getTarget(Paths.get(simplePath)));
     }
 
     @Test
@@ -39,7 +39,7 @@ public class MoverTest {
         mover.setPartialMatch(true);
         mover.setTargetDirectory("/dir/dir$yyyy$");
         assertEquals(Paths.get("/dir/dir" + LocalDate.now().getYear() + "/test"),
-                new Mover(mover).getTarget(Paths.get(simplePath)));
+                new Mover(mover, null).getTarget(Paths.get(simplePath)));
     }
 
     @Test
@@ -49,7 +49,7 @@ public class MoverTest {
         mover.setPartialMatch(true);
         mover.setTargetDirectory("/dir/dir$yyyy$/dir$MM$");
         assertEquals(Paths.get("/dir/dir" + LocalDate.now().getYear() + "/dir" + LocalDate.now().format(DateTimeFormatter.ofPattern("MM")) + "/test"),
-                new Mover(mover).getTarget(Paths.get(simplePath)));
+                new Mover(mover, null).getTarget(Paths.get(simplePath)));
     }
 
     @Test
@@ -58,7 +58,7 @@ public class MoverTest {
         final Movers.Mover mover = new Movers.Mover();
         mover.setPartialMatch(true);
         mover.setTargetDirectory("/dir/%(\\w)%1/%");
-        assertEquals(Paths.get("/dir/t/test"), new Mover(mover).getTarget(Paths.get(simplePath)));
+        assertEquals(Paths.get("/dir/t/test"), new Mover(mover, null).getTarget(Paths.get(simplePath)));
     }
 
     @Test
@@ -67,7 +67,7 @@ public class MoverTest {
         final Movers.Mover mover = new Movers.Mover();
         mover.setPartialMatch(true);
         mover.setTargetDirectory("/dir/%(\\d)%1/%");
-        assertEquals(Paths.get("/dir/test"), new Mover(mover).getTarget(Paths.get(simplePath)));
+        assertEquals(Paths.get("/dir/test"), new Mover(mover, null).getTarget(Paths.get(simplePath)));
     }
 
     @Test
@@ -76,7 +76,7 @@ public class MoverTest {
         final Movers.Mover mover = new Movers.Mover();
         mover.setPartialMatch(true);
         mover.setTargetDirectory("/dir/%(\\w)(\\w{2})%1/2/%");
-        assertEquals(Paths.get("/dir/t/es/test"), new Mover(mover).getTarget(Paths.get(simplePath)));
+        assertEquals(Paths.get("/dir/t/es/test"), new Mover(mover, null).getTarget(Paths.get(simplePath)));
     }
 
     @Test
@@ -85,7 +85,7 @@ public class MoverTest {
         final Movers.Mover mover = new Movers.Mover();
         mover.setPartialMatch(true);
         mover.setTargetDirectory("/dir/%(\\w)%1/%%(\\d+)%Year 1/%");
-        assertEquals(Paths.get("/dir/t/Year 2016/test - 2016"), new Mover(mover).getTarget(Paths.get(simplePath)));
+        assertEquals(Paths.get("/dir/t/Year 2016/test - 2016"), new Mover(mover, null).getTarget(Paths.get(simplePath)));
     }
 
     @Test
@@ -94,6 +94,7 @@ public class MoverTest {
         final Movers.Mover mover = new Movers.Mover();
         mover.setPartialMatch(true);
         mover.setTargetDirectory("/dir/%(.*?)\\.?s(\\d{2})e\\d{2}%1/Season 2/%");
-        assertEquals(Paths.get("/dir/Tv.Show/Season 01/Tv.Show.s01e04.title.mkv"), new Mover(mover).getTarget(Paths.get(simplePath)));
+        assertEquals(Paths.get("/dir/Tv.Show/Season 01/Tv.Show.s01e04.title.mkv"),
+                new Mover(mover, null).getTarget(Paths.get(simplePath)));
     }
 }

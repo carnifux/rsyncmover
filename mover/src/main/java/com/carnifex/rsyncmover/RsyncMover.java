@@ -51,11 +51,12 @@ public class RsyncMover {
                 .map(time -> new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(), config.getEmail().getFrom(), time, audit))
                 .collect(Collectors.toList());
         components.putIfAbsent(Emailer.class, emailers);
-        final List<Mover> movers = config.getMovers().stream().map(Mover::new).collect(Collectors.toList());
+        final List<Mover> movers = config.getMovers().stream().map(m -> new Mover(m, audit)).collect(Collectors.toList());
 
         if (config.moveFiles()) {
             final MoverThread moverThread = initMoverThread(config, audit);
-            final FileChangeWatcher fileChangeWatcher = initFileChangeWatcher(movers, moverThread);
+            final SyncedFiles syncedFiles = new SyncedFiles(Paths.get(config.getMoverPassivateLocation()));
+            final FileChangeWatcher fileChangeWatcher = new FileChangeWatcher(movers, moverThread, syncedFiles);
             final List<FileWatcher> fileWatchers = initFileWatchers(config, moverThread, fileChangeWatcher, audit);
             components.putIfAbsent(FileChangeWatcher.class, fileChangeWatcher);
             components.putIfAbsent(MoverThread.class, moverThread);
@@ -92,9 +93,6 @@ public class RsyncMover {
             .collect(Collectors.toList());
     }
 
-    private static FileChangeWatcher initFileChangeWatcher(final List<Mover> movers, final MoverThread moverThread) {
-        return new FileChangeWatcher(movers, moverThread);
-    }
 
     public static synchronized void reinit(final String configPath) {
         shutdownAll();

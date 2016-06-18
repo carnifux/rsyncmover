@@ -40,6 +40,17 @@
                                         only needed on linux, don't set on windows</xs:documentation>
                                 </xs:annotation>
                             </xs:element>
+                            <xs:element type="xs:string" name="passivateLocation">
+                                <xs:annotation>
+                                    <xs:documentation>location of passivate from, required if downloadFiles = true</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:boolean" name="depassivateEachTime" default="false">
+                                <xs:annotation>
+                                    <xs:documentation>if true, reads the list of seen files each time it downloads.
+                                        reduced average memory footprint but more disk activity</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
                             <xs:element name="mover" maxOccurs="unbounded" minOccurs="0">
                                 <xs:annotation>
                                     <xs:documentation>each mover defines a folder to move to and the rules under which those can be matched</xs:documentation>

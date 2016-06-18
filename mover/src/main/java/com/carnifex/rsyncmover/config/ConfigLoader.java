@@ -63,36 +63,39 @@ public class ConfigLoader {
         final Map<String, List<Mover>> moversByName = current.getMovers().getMover().stream()
                 .collect(Collectors.groupingBy(Mover::getName));
         for (final Mover mover : defaultMover.getMovers().getMover()) {
-            for (Mover other : moversByName.get(mover.getName())) {
-                if (other != null) {
-                    other.setPartialMatch(mover.isPartialMatch());
-                    if (mover.getPatterns() != null) {
-                        for (final String s : mover.getPatterns().getPattern()) {
-                            if (other.getPatterns() == null) {
-                                other.setPatterns(new Patterns());
-                            }
-                            if (!other.getPatterns().getPattern().contains(s)) {
-                                other.getPatterns().getPattern().add(s);
-                            }
-                        }
-                    }
-                    if (mover.getExtensions() != null) {
-                        for (final String s : mover.getExtensions().getExtension()) {
-                            if (other.getExtensions() == null) {
-                                other.setExtensions(new Extensions());
-                            }
-                            if (!other.getExtensions().getExtension().contains(s)) {
-                                other.getExtensions().getExtension().add(s);
+            final List<Mover> movers = moversByName.get(mover.getName());
+            if (movers != null) {
+                for (Mover other : movers) {
+                    if (other != null) {
+                        other.setPartialMatch(mover.isPartialMatch());
+                        if (mover.getPatterns() != null) {
+                            for (final String s : mover.getPatterns().getPattern()) {
+                                if (other.getPatterns() == null) {
+                                    other.setPatterns(new Patterns());
+                                }
+                                if (!other.getPatterns().getPattern().contains(s)) {
+                                    other.getPatterns().getPattern().add(s);
+                                }
                             }
                         }
-                    }
-                    if (mover.getDontMatchPatterns() != null) {
-                        for (final String s : mover.getDontMatchPatterns().getPattern()) {
-                            if (other.getDontMatchPatterns() == null) {
-                                other.setDontMatchPatterns(new DontMatchPatterns());
+                        if (mover.getExtensions() != null) {
+                            for (final String s : mover.getExtensions().getExtension()) {
+                                if (other.getExtensions() == null) {
+                                    other.setExtensions(new Extensions());
+                                }
+                                if (!other.getExtensions().getExtension().contains(s)) {
+                                    other.getExtensions().getExtension().add(s);
+                                }
                             }
-                            if (!other.getDontMatchPatterns().getPattern().contains(s)) {
-                                other.getDontMatchPatterns().getPattern().add(s);
+                        }
+                        if (mover.getDontMatchPatterns() != null) {
+                            for (final String s : mover.getDontMatchPatterns().getPattern()) {
+                                if (other.getDontMatchPatterns() == null) {
+                                    other.setDontMatchPatterns(new DontMatchPatterns());
+                                }
+                                if (!other.getDontMatchPatterns().getPattern().contains(s)) {
+                                    other.getDontMatchPatterns().getPattern().add(s);
+                                }
                             }
                         }
                     }

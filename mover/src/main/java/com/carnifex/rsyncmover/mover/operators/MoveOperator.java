@@ -1,6 +1,7 @@
 package com.carnifex.rsyncmover.mover.operators;
 
 
+import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.mover.Permissions;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -17,10 +18,15 @@ import java.util.Set;
 public abstract class MoveOperator {
 
     protected static final Logger logger = LogManager.getLogger();
+    protected final Audit audit;
 
-    protected abstract void operate(final Path from, final Path to) throws IOException;
+    protected abstract Path operate(final Path from, final Path to) throws IOException;
     public abstract String getMethod();
     public abstract boolean shouldSetFilePermissions();
+
+    protected MoveOperator(final Audit audit) {
+        this.audit = audit;
+    }
 
     public void move(final Path from, final Path to, final Set<PosixFilePermission> filePermissions) throws IOException {
         if (from.equals(to)) {
@@ -56,20 +62,26 @@ public abstract class MoveOperator {
         }
     }
 
-    public static MoveOperator create(final String value, final List<String> additionalArguments)  {
+    public static MoveOperator create(final String value, final List<String> additionalArguments, final Audit audit)  {
         switch (value) {
             case "move":
-                return new Move();
+                return new Move(audit);
             case "copy":
-                return new Copy();
+                return new Copy(audit);
             case "symlink":
-                return new Symlink();
+                return new Symlink(audit);
             case "move+symlink":
-                return new MoveSymlink();
+                return new MoveSymlink(audit);
+            case "filebot+move":
+                return new FileBotMove(audit, additionalArguments);
+            case "filebot+move+symlink":
+                return new FileBotSymlink(audit, additionalArguments);
+            case "filebot+copy":
+                return new FileBotCopy(audit, additionalArguments);
             case "filebot":
-                return new FileBot(additionalArguments);
+                return new FileBot(audit, additionalArguments);
             default:
-                return new NoOp();
+                return new NoOp(audit);
         }
     }
 

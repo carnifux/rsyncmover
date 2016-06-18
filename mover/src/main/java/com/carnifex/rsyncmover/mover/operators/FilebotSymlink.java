@@ -5,29 +5,32 @@ import com.carnifex.rsyncmover.audit.Audit;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 
-public class MoveSymlink extends MoveOperator {
+public class FileBotSymlink extends MoveOperator {
 
     private final Move move;
+    private final FileBot fileBot;
     private final Symlink symlink;
 
-    public MoveSymlink(final Audit audit) {
+    public FileBotSymlink(final Audit audit, final List<String> additionalArguments) {
         super(audit);
         this.move = new Move(audit);
+        this.fileBot = new FileBot(audit, additionalArguments);
         this.symlink = new Symlink(audit);
     }
 
     @Override
     protected Path operate(final Path from, final Path to) throws IOException {
-        logger.info("Moving and creating symlink for " + from + ", " + to);
         move.operate(from, to);
-        symlink.operate(to, from);
-        return to;
+        final Path fromFilebot = fileBot.operate(null, to);
+        symlink.operate(fromFilebot, from);
+        return fromFilebot;
     }
 
     @Override
     public String getMethod() {
-        return "move+symlink";
+        return "filebot+move+symlink";
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.carnifex.rsyncmover.mover.io;
 
 
+import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.mover.operators.MoveOperator;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -35,7 +36,7 @@ public class Mover {
     private final MoveOperator operator;
     private final int priority;
 
-    public Mover(final com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover mover) {
+    public Mover(final com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover mover, final Audit audit) {
         this.name = mover.getName();
         this.patterns = mover.getPatterns() != null ? mover.getPatterns().getPattern().stream().map(Pattern::compile).collect(Collectors.toList())
                 : Collections.emptyList();
@@ -45,7 +46,8 @@ public class Mover {
         this.partialMatch = mover.isPartialMatch() != null ? mover.isPartialMatch() : false;
         this.target = new Target(mover.getTargetDirectory());
         this.operator = MoveOperator.create(mover.getMoveOperation() != null ? mover.getMoveOperation() : DEFAULT_MOVE_OPERATION,
-                mover.getAdditionalArguments() != null ? mover.getAdditionalArguments().getArg() : Collections.emptyList());
+                mover.getAdditionalArguments() != null ? mover.getAdditionalArguments().getArg() : Collections.emptyList(),
+                audit);
         this.priority = mover.getPriority() != null ? mover.getPriority() : DEFAULT_PRIORITY;
         logger.info("Mover for target directory " + target.partialPaths.stream().collect(Collectors.joining()) + " with move operation " + operator.getMethod() + " successfully initialized");
     }

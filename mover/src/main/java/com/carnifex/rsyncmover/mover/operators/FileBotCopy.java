@@ -4,23 +4,29 @@ import com.carnifex.rsyncmover.audit.Audit;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 
 
-public class NoOp extends MoveOperator {
+public class FileBotCopy extends MoveOperator {
 
-    protected NoOp(final Audit audit) {
+    private final Copy copy;
+    private final FileBot fileBot;
+
+    public FileBotCopy(final Audit audit, final List<String> additionalArguments) {
         super(audit);
+        this.copy = new Copy(audit);
+        this.fileBot = new FileBot(audit, additionalArguments);
     }
 
     @Override
     protected Path operate(final Path from, final Path to) throws IOException {
-        logger.error("Using no-op mover for " + from + " to " + to + " - check config");
-        return from;
+        copy.operate(from, to);
+        return fileBot.operate(null, to);
     }
 
     @Override
     public String getMethod() {
-        return "noop";
+        return "filebot+copy";
     }
 
     @Override

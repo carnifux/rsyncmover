@@ -1,5 +1,6 @@
 package com.carnifex.rsyncmover.mover.io;
 
+import com.carnifex.rsyncmover.sync.SyncedFiles;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -28,14 +29,16 @@ public class FileChangeWatcher extends Thread {
     private final List<Mover> movers;
     private final boolean isWindows;
     private final MoverThread moverThread;
+    private final SyncedFiles syncedFiles;
 
-    public FileChangeWatcher(final List<Mover> movers, final MoverThread moverThread) {
+    public FileChangeWatcher(final List<Mover> movers, final MoverThread moverThread, final SyncedFiles syncedFiles) {
         super("FileChangeWatcher");
         this.filesToMoveSoon = ConcurrentHashMap.newKeySet();
         this.dontReAdd = ConcurrentHashMap.newKeySet();
         this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         this.movers = movers;
         this.moverThread = moverThread;
+        this.syncedFiles = syncedFiles;
         this.start();
         logger.info("File change watcher successfully initialized");
     }
@@ -60,6 +63,10 @@ public class FileChangeWatcher extends Thread {
             dontReAdd.remove(path);
             return;
         }
+        if (!syncedFiles.shouldDownload("file", path.toString())) {
+            logger.info("Not re-moving file we've already moved: " + path.toString());
+            return;
+        }
         logger.info("Registering " + path.toString());
         filesToMoveSoon.add(new PathHolder(path));
     }
@@ -79,6 +86,8 @@ public class FileChangeWatcher extends Thread {
                         if (mover != null) {
                             final Path target = mover.getTarget(holder.get());
                             moverThread.submit(holder.get(), target, mover.getMoveOperator());
+                            syncedFiles.addDownloadedPath("file", holder.get().toString());
+                            syncedFiles.finished();
                         } else {
                             logger.error("Found multiple movers for file " + holder.get().toString() + "; not moving");
                         }

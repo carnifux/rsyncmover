@@ -44,6 +44,10 @@ public class Config {
         }
     }
 
+    public String getMoverPassivateLocation() {
+        return config.getMovers().getPassivateLocation();
+    }
+
     public List<String> getWatchDir() {
         return config.getWatches().getWatch();
     }
