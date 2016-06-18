@@ -30,24 +30,31 @@ public class SyncedFiles {
     public SyncedFiles(final Path passivateLocation) {
         this.synced = new ConcurrentHashMap<>();
         this.passivateLocation = passivateLocation;
-        final File file = passivateLocation.toFile();
-        if (!file.exists()) {
-            boolean create = false;
-            try {
-                create = file.createNewFile();
-            } catch (IOException ignore) {}
-            if (!create) {
-                logger.error("Could not create passivate file, will not function");
-                this.active = false;
-                this.passive = false;
+        if (passivateLocation != null) {
+            final File file = passivateLocation.toFile();
+            if (!file.exists()) {
+                boolean create = false;
+                try {
+                    create = file.createNewFile();
+                } catch (IOException ignore) {}
+                if (!create) {
+                    logger.error("Could not create passivate file, will not function");
+                    this.active = false;
+                    this.passive = false;
+                } else {
+                    this.active = true;
+                    this.passive = true;
+                }
             } else {
                 this.active = true;
                 this.passive = true;
             }
         } else {
-            this.active = true;
-            this.passive = true;
+            logger.error("Could not create passivate file, will not function");
+            this.active = false;
+            this.passive = false;
         }
+
     }
 
     public boolean shouldDownload(final String serverName, final String path) {

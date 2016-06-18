@@ -55,7 +55,8 @@ public class RsyncMover {
 
         if (config.moveFiles()) {
             final MoverThread moverThread = initMoverThread(config, audit);
-            final SyncedFiles syncedFiles = new SyncedFiles(Paths.get(config.getMoverPassivateLocation()));
+            final String moverPassivateLocation = config.getMoverPassivateLocation();
+            final SyncedFiles syncedFiles = new SyncedFiles(moverPassivateLocation != null ? Paths.get(moverPassivateLocation) : null);
             final FileChangeWatcher fileChangeWatcher = new FileChangeWatcher(movers, moverThread, syncedFiles);
             final List<FileWatcher> fileWatchers = initFileWatchers(config, moverThread, fileChangeWatcher, audit);
             components.putIfAbsent(FileChangeWatcher.class, fileChangeWatcher);
