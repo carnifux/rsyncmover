@@ -28,7 +28,7 @@ public abstract class MoveOperator {
         this.audit = audit;
     }
 
-    public void move(final Path from, final Path to, final Set<PosixFilePermission> filePermissions) throws IOException {
+    public Path move(final Path from, final Path to, final Set<PosixFilePermission> filePermissions) throws IOException {
         if (from.equals(to)) {
             final String msg = "Origin and destination are the same, not moving: " + to;
             logger.info(msg);
@@ -48,8 +48,9 @@ public abstract class MoveOperator {
                 Permissions.setPermissions(parent, filePermissions);
             }
         }
-        operate(from, to);
-        log(to);
+        final Path path = operate(from, to);
+        log(path);
+        return path;
     }
 
     private void log(final Path path) {
@@ -65,7 +66,7 @@ public abstract class MoveOperator {
     public static MoveOperator create(final String value, final List<String> additionalArguments, final Audit audit)  {
         switch (value) {
             case "move":
-                return new Move(audit);
+                return  new Move(audit);
             case "copy":
                 return new Copy(audit);
             case "symlink":
@@ -84,5 +85,4 @@ public abstract class MoveOperator {
                 return new NoOp(audit);
         }
     }
-
 }

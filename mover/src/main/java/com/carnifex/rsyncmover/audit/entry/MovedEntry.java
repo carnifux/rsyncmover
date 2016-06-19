@@ -1,6 +1,8 @@
 package com.carnifex.rsyncmover.audit.entry;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.carnifex.rsyncmover.audit.Type.MOVED;
 
@@ -21,8 +23,22 @@ public class MovedEntry extends Entry {
 
     @Override
     public String format() {
+        final String moveTarget;
+        if (operation.startsWith("filebot")) {
+            moveTarget = to.substring(to.indexOf(File.separator), to.length());
+        } else {
+            final List<Integer> separators = new ArrayList<>();
+            final char[] chars = to.toCharArray();
+            for (int i = 0; i < chars.length; i++) {
+                if (chars[i] == File.separatorChar) {
+                    separators.add(i);
+                }
+            }
+            moveTarget = to.substring(separators.get(separators.size() - 2), separators.get(separators.size() - 1));
+        }
         final String[] fromSplit = from.split(PATH_SEPARATOR);
-        return operation + ": " + fromSplit[fromSplit.length - 1] + " -> " + to.substring(0, to.lastIndexOf(File.separator));
+        return operation + ": " + fromSplit[fromSplit.length - 1] + " -> " + moveTarget;
+
     }
 
     @Override

@@ -94,10 +94,10 @@ public class MoverThread extends Thread {
                 }
                 audit.add(new DuplicateEntry(pathObject.getTo().toString()));
             }
-            pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions);
-            audit.add(new MovedEntry(pathObject.getFrom().toString(), pathObject.getTo().toString(), pathObject.getOperator().getMethod()));
+            final Path finalDir = pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions);
+            audit.add(new MovedEntry(pathObject.getFrom().toString(), finalDir.toString(), pathObject.getOperator().getMethod()));
             if (filePermissions != null && pathObject.getOperator().shouldSetFilePermissions()) {
-                Permissions.setPermissions(pathObject.getTo(), filePermissions);
+                Permissions.setPermissions(finalDir, filePermissions);
             }
         } catch (Exception e) {
             final String s = "Error moving from " + pathObject.getFrom().toString() + " to " + pathObject.getTo().toString();
