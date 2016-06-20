@@ -52,6 +52,9 @@ public class Mover {
         logger.info("Mover for target directory " + target.partialPaths.stream().collect(Collectors.joining()) + " with move operation " + operator.getMethod() + " successfully initialized");
     }
 
+    public String getName() {
+        return name;
+    }
 
     public Path getTarget(final Path path) {
         return Paths.get(target.getPath(path.getFileName().toString()) + File.separator + path.getFileName().toString());

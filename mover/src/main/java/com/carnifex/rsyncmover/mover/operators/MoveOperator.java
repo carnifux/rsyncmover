@@ -49,7 +49,7 @@ public abstract class MoveOperator {
             }
         }
         final Path path = operate(from, to);
-        log(path);
+        log(to);
         return path;
     }
 

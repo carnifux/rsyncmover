@@ -4,6 +4,7 @@ package com.carnifex.rsyncmover.config;
 import com.carnifex.rsyncmover.beans.RsyncMover;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.AdditionalArguments;
+import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.DontMatchMoverByName;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.DontMatchPatterns;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.Extensions;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.Patterns;
@@ -15,8 +16,11 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class ConfigLoader {
@@ -98,9 +102,37 @@ public class ConfigLoader {
                                 }
                             }
                         }
+                        if (mover.getDontMatchMoverByName() != null) {
+                            for (final String s : mover.getDontMatchMoverByName().getName()) {
+                                if (other.getDontMatchMoverByName() == null) {
+                                    other.setDontMatchMoverByName(new DontMatchMoverByName());
+                                }
+                                if (!other.getDontMatchMoverByName().getName().contains(s)) {
+                                    other.getDontMatchMoverByName().getName().add(s);
+                                }
+                            }
+                        }
                     }
                 }
             }
+        }
+
+        for (final Mover mover : moversByName.values().stream().flatMap(Collection::stream).filter(m -> m.getDontMatchMoverByName() != null).collect(Collectors.toList())) {
+            final Set<String> dontMatch = new HashSet<>();
+            for (final String name : mover.getDontMatchMoverByName().getName()) {
+                final List<Mover> movers = moversByName.get(name);
+                movers.forEach(m -> {
+                    if (m.getPatterns() != null) {
+                        dontMatch.addAll(m.getPatterns().getPattern());
+                    }
+                });
+            }
+            if (mover.getDontMatchPatterns() == null) {
+                mover.setDontMatchPatterns(new DontMatchPatterns());
+            }
+            dontMatch.addAll(mover.getDontMatchPatterns().getPattern());
+            mover.getDontMatchPatterns().getPattern().clear();
+            mover.getDontMatchPatterns().getPattern().addAll(dontMatch);
         }
     }
 

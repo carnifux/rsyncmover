@@ -104,7 +104,7 @@ public class Audit extends Thread {
                 out = new ObjectOutputStream(fileOut);
                 out.writeObject(map);
                 allEntries.clear();
-                logger.debug("Audit passivated - " + (oldSize - newSize) + " entries added to passivated location");
+                logger.debug("Audit passivated - " + (newSize - oldSize) + " entries added to passivated location");
             } catch (IOException e) {
                 final String msg = "Exception writing passivated entries";
                 logger.error(msg, e);

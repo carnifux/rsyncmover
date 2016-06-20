@@ -1,0 +1,11 @@
+<rsyncMover>
+    <movers>
+        <useDefaultMatching>true</useDefaultMatching>
+        <mover>
+            <name>movies</name>
+        </mover>
+        <mover>
+            <name>tv</name>
+        </mover>
+    </movers>
+</rsyncMover>

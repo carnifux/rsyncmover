@@ -9,10 +9,9 @@ import java.time.format.DateTimeFormatter;
 
 import static org.junit.Assert.assertEquals;
 
-/**
- * Created by carni on 28/03/2016.
- */
+
 public class MoverTest {
+
 
     @Test
     public void getTarget_Simple() throws Exception {

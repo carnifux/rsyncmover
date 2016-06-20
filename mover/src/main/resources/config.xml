@@ -2,10 +2,9 @@
     <movers>
         <mover>
             <name>movies</name>
-            <dontMatchPatterns>
-                <pattern>\d+[Xx]\d+</pattern>
-                <pattern>[Ss]\d+[Ee]\d+</pattern>
-            </dontMatchPatterns>
+            <dontMatchMoverByName>
+                <name>tv</name>
+            </dontMatchMoverByName>
             <extensions>
                 <extension>mkv</extension>
                 <extension>avi</extension>

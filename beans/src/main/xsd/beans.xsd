@@ -106,6 +106,17 @@
                                                 </xs:sequence>
                                             </xs:complexType>
                                         </xs:element>
+                                        <xs:element name="dontMatchMoverByName" minOccurs="0">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element type="xs:string" name="name" maxOccurs="unbounded" minOccurs="1">
+                                                        <xs:annotation>
+                                                            <xs:documentation>will add all match patterns from the named mover to this ones dont match</xs:documentation>
+                                                        </xs:annotation>
+                                                    </xs:element>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
                                         <xs:element name="extensions" minOccurs="0">
                                             <xs:complexType>
                                                 <xs:sequence>

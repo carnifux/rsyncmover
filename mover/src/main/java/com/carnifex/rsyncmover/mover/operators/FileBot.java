@@ -5,6 +5,7 @@ import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
@@ -13,6 +14,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,13 +29,16 @@ public class FileBot extends MoveOperator {
     private String filebotPath = "filebot";
     private final Pattern moveTargetRegex = Pattern.compile("\\[MOVE\\].*?\\[.*?\\] to \\[(.*?)\\]");
     private final Pattern formatDetectionRegex = Pattern.compile("--format");
-    private final Pattern formatModificationRegex = Pattern.compile("(\"?)(.*)");
+    private final Pattern formatModificationRegex = Pattern.compile("(\"*)(.*)");
+    private final Pattern pathFindingRegex;
     private final boolean isWindows;
 
     public FileBot(final Audit audit, final List<String> additionalArguments) {
         super(audit);
         this.additionalArguments = new ArrayList<>(additionalArguments);
         this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        this.pathFindingRegex = Pattern.compile("(.*)\\" + File.separator + "(.*)\\" + File.separator +
+                "..\\" + File.separator + "(.*)\\" + File.separator + "(.*\\..*)");
         {
             final Iterator<String> iter = this.additionalArguments.iterator();
             while (iter.hasNext()) {
@@ -83,24 +88,8 @@ public class FileBot extends MoveOperator {
     }
 
     private Optional<Path> exec(final Path to, final String... args) throws IOException {
-        final String[] argArray = new String[args.length + additionalArguments.size()];
-        System.arraycopy(args, 0, argArray, 0, args.length);
-        for (int i = args.length, j = 0; i < argArray.length; i++) {
-            argArray[i] = additionalArguments.get(j++);
-        }
         final boolean isDirectory = Files.isDirectory(to);
-        // hack to get filebot to deal with folders correctly
-        if (isDirectory) {
-            for (int i = 0; i < argArray.length; i++) {
-                final Matcher matcher = formatDetectionRegex.matcher(argArray[i]);
-                if (matcher.find() && i + 1 < argArray.length) {
-                    final Matcher modification = formatModificationRegex.matcher(argArray[i + 1]);
-                    argArray[i + 1] = modification.group(1) + "../" + modification.group(2);
-                    logger.info("Augmented format argument for filebot directory; now reads \"" + argArray[i + 1] + "\"");
-                    break;
-                }
-            }
-        }
+        final String[] argArray = buildArgArray(isDirectory, args);
         logger.trace("Executing \"" + Stream.of(argArray).collect(Collectors.joining(" ")) + "\"");
         final Process exec = Runtime.getRuntime().exec(argArray);
         final Optional<Path> newPath = findNewPath(new BufferedReader(new InputStreamReader(exec.getInputStream())).lines());
@@ -124,6 +113,30 @@ public class FileBot extends MoveOperator {
     }
 
     // visible for testing
+    String[] buildArgArray(final boolean isDirectory, final String... args) {
+        final String[] argArray = new String[args.length + additionalArguments.size()];
+        System.arraycopy(args, 0, argArray, 0, args.length);
+        for (int i = args.length, j = 0; i < argArray.length; i++) {
+            argArray[i] = additionalArguments.get(j++);
+        }
+        // hack to get filebot to deal with folders correctly
+        if (isDirectory) {
+            for (int i = 0; i < argArray.length; i++) {
+                final Matcher matcher = formatDetectionRegex.matcher(argArray[i]);
+                if (matcher.find() && i + 1 < argArray.length) {
+                    final Matcher modification = formatModificationRegex.matcher(argArray[i + 1]);
+                    if (modification.find()) {
+                        argArray[i + 1] = modification.group(1) + "../" + modification.group(2);
+                        logger.info("Augmented format argument for filebot directory; now reads \"" + argArray[i + 1] + "\"");
+                        break;
+                    }
+                }
+            }
+        }
+        return argArray;
+    }
+
+    // visible for testing
     Optional<Path> findNewPath(final Stream<String> output) {
         final List<String> paths = output.peek(logger::trace)
                 .filter(line -> line.startsWith("[MOVE]"))
@@ -131,8 +144,28 @@ public class FileBot extends MoveOperator {
                 .filter(Matcher::find)
                 .map(matcher -> matcher.group(1))
                 .collect(Collectors.toList());
-        if (paths.size() == 1) {
-            return Optional.of(Paths.get(paths.get(0)));
+        if (paths.size() > 0) {
+            final boolean isFolder = paths.get(0).contains(".." + File.separator);
+            if (paths.size() == 1 && !isFolder) {
+                return Optional.of(Paths.get(paths.get(0)));
+            }
+            if (isFolder) {
+                final List<String> corrected = paths.stream()
+                        .map(path -> {
+                            final Matcher matcher = pathFindingRegex.matcher(path);
+                            if (matcher.find()) {
+                                return matcher.group(1) + File.separator + matcher.group(3);
+                            }
+                            return null;
+                        })
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toList());
+                if (corrected.size() == 1) {
+                    logger.info("Resolved filebot folder new path to " + corrected.get(0));
+                    return Optional.of(Paths.get(corrected.get(0)));
+                }
+            }
         }
         logger.error("Unable to find filebot path");
         return Optional.empty();
