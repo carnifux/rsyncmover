@@ -6,8 +6,8 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -17,7 +17,7 @@ public class FileBotTest {
 
     @Test
     public void findNewPath() throws Exception {
-        final Stream<String> output = Stream.of("Rename episodes using [TheTVDB]",
+        final List<String> output = Arrays.asList("Rename episodes using [TheTVDB]",
                 "Auto-detected query: [Silicon Valley]", "Fetching episode data for [Silicon Valley]",
                 "Fetching episode data for [Silicon Valley Rebels]", "Fetching episode data for [Start-ups: Silicon Valley]",
                 "[MOVE] Rename [D:\\tv\\Silicon.Valley.S03E01.720p.HDTV.x264-SVA.mkv] to [D:\\tv\\Silicon Valley - 3x01 - Founder Friendly.mkv]",
@@ -30,7 +30,7 @@ public class FileBotTest {
 
     @Test
     public void findNewPath_folders() throws Exception {
-        final Stream<String> output = Stream.of("Rename episodes using [TheTVDB]",
+        final List<String> output = Arrays.asList("Rename episodes using [TheTVDB]",
                 "Auto-detected query: [Silicon Valley]", "Fetching episode data for [Silicon Valley]",
                 "Fetching episode data for [Silicon Valley Rebels]", "Fetching episode data for [Start-ups: Silicon Valley]",
                 "[MOVE] Rename [D:\\tv\\Silicon.Valley.S03E01.720p.HDTV.x264-SVA.mkv] to [D:\\tv\\Silicon Valley\\Season 3\\Silicon Valley - 3x01 - Founder Friendly.mkv]",
@@ -43,7 +43,7 @@ public class FileBotTest {
     @Test
     public void findNewPath_moveFolder() throws Exception {
         final FileBot fileBot = new FileBot(null, Collections.emptyList());
-        final Optional<Path> newPath = fileBot.findNewPath(Stream.of("[MOVE] Rename [" + File.separator + "tv" + File.separator + "The.Simpsons.S12.DVDRip.x264-CtrlSD" + File.separator + "" +
+        final Optional<Path> newPath = fileBot.findNewPath(Arrays.asList("[MOVE] Rename [" + File.separator + "tv" + File.separator + "The.Simpsons.S12.DVDRip.x264-CtrlSD" + File.separator + "" +
                 "The.Simpsons.S12E21.Simpsons.Tall.Tales.DVDrip.x264-CtrlSD.mkv] to " +
                 "[" + File.separator + "tv" + File.separator + "The.Simpsons.S12.DVDRip.x264-CtrlSD" + File.separator + ".." + File.separator + "The Simpsons" + File.separator + "Season 12" + File.separator + "The" +
                 " Simpsons - S12E21 - Simpsons Tall Tales.mkv]"));

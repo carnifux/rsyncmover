@@ -44,6 +44,7 @@ public class Syncer extends Thread {
         this.dlDirs = dlDirs;
         this.syncedFiles = syncedFiles;
         this.sshs = sshs;
+        this.sshs.forEach(ssh -> audit.addDownloadWatcher(ssh.getDownloadWatcher()));
         this.syncFrequency = syncFrequency;
         this.passivateEachTime = passivateEachTime;
         this.movers = downloadsMustMatchMover ? movers : Collections.emptyList();

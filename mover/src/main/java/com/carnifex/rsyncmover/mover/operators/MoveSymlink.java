@@ -5,16 +5,17 @@ import com.carnifex.rsyncmover.audit.Audit;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 
 public class MoveSymlink extends MoveOperator {
 
     private final Move move;
     private final Symlink symlink;
 
-    public MoveSymlink(final Audit audit) {
-        super(audit);
-        this.move = new Move(audit);
-        this.symlink = new Symlink(audit);
+    public MoveSymlink(final Audit audit, final List<String> additionalArguments) {
+        super(audit, additionalArguments);
+        this.move = new Move(audit, additionalArguments);
+        this.symlink = new Symlink(audit, additionalArguments);
     }
 
     @Override

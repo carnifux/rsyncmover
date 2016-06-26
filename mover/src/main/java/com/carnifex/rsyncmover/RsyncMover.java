@@ -38,7 +38,7 @@ public class RsyncMover {
     }
 
     public static synchronized void init(final Config config) {
-        // audit will not be reinitialised, so init here
+
         final Audit audit = new Audit(config.shouldPassivateAudit(), config.getAuditPassivateLocation(), (Audit) components.get(Audit.class));
         components.put(Audit.class, audit);
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -47,6 +47,7 @@ public class RsyncMover {
                 audit.shutdown();
             }
         });
+
         final List<Emailer> emailers = config.getEmailSendTime().stream()
                 .map(time -> new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(), config.getEmail().getFrom(), time, audit))
                 .collect(Collectors.toList());
@@ -64,6 +65,7 @@ public class RsyncMover {
             components.putIfAbsent(FileWatcher.class, fileWatchers);
             logger.info("File moving successfully initiated");
         }
+
         if (config.downloadFiles()) {
             final List<Ssh> sshs = initSshs(config);
             final Syncer syncer = initSyncer(config, movers, sshs, audit);
@@ -121,7 +123,6 @@ public class RsyncMover {
         if (components.containsKey(Server.class)) {
             final Server server = (Server) components.remove(Server.class);
             server.shutdown();
-            server.interrupt();
         }
         // should contain audit and config watcher
         if (components.size() != 2) {

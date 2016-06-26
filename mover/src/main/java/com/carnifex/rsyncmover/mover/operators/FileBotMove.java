@@ -13,8 +13,8 @@ public class FileBotMove extends MoveOperator {
     private final FileBot fileBot;
 
     public FileBotMove(final Audit audit, final List<String> additionalArguments) {
-        super(audit);
-        this.move = new Move(audit);
+        super(audit, additionalArguments);
+        this.move = new Move(audit, additionalArguments);
         this.fileBot = new FileBot(audit, additionalArguments);
     }
 

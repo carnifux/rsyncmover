@@ -11,6 +11,10 @@ public class ErrorEntry extends Entry {
     private final Throwable throwable;
     private final String message;
 
+    public ErrorEntry(final String message) {
+        this(message, null);
+    }
+
     public ErrorEntry(final String message, final Throwable throwable) {
         super(ERROR);
         this.message = message;

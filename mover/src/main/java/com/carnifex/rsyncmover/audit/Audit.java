@@ -2,82 +2,110 @@ package com.carnifex.rsyncmover.audit;
 
 import com.carnifex.rsyncmover.audit.entry.Entry;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import com.carnifex.rsyncmover.sync.Ssh.DownloadWatcher;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.*;
+import java.io.Closeable;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InvalidClassException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-import static com.carnifex.rsyncmover.audit.Type.*;
+import static com.carnifex.rsyncmover.audit.Type.DOWNLOADED;
+import static com.carnifex.rsyncmover.audit.Type.DUPLICATE;
+import static com.carnifex.rsyncmover.audit.Type.ERROR;
+import static com.carnifex.rsyncmover.audit.Type.MOVED;
+import static com.carnifex.rsyncmover.audit.Type.SEEN;
 
 
 public class Audit extends Thread {
 
-    private static final String HEADERS = "HTTP/1.0 200 OK\r\nServer: rsyncMover\r\nContent-type: text/html\r\n" +
-            "Content-length: %d\r\nConnection: close\r\n\r\n";
+    private static final String HEADERS = "";
     private static final List<Type> types = Arrays.asList(ERROR, DUPLICATE, MOVED, DOWNLOADED, SEEN);
-    private static final long passivateInterval = 5 * 1000 * 60; // 5 minutes
+    private static final long persistInterval = 5 * 1000 * 60; // 5 minutes
     private static final Logger logger = LogManager.getLogger();
     private final Map<Type, Set<Entry>> allEntries;
     private final Map<Type, Set<Entry>> dailyEntries;
     private final Lock lock;
     private final LocalDateTime startTime;
-    private final boolean passivate;
-    private final String passivateLocation;
+    private final boolean persist;
+    private final String persistLocation;
     private volatile boolean locked;
-    private volatile long nextPassivate;
-    private volatile boolean needToPassivate;
-    private volatile boolean passivated;
+    private volatile long nextPersist;
+    private volatile boolean needToPersist;
+    private volatile boolean persisted;
+    private transient List<DownloadWatcher> downloadWatchers;
 
-    public Audit(final boolean passivate, final String passivateLocation, final Audit old) {
+    public Audit(final boolean persist, final String persistLocation, final Audit old) {
         super("AuditThread");
         if (old == null) {
             this.allEntries = new ConcurrentHashMap<>();
             this.dailyEntries = new ConcurrentHashMap<>();
+            this.startTime = LocalDateTime.now();
         } else {
             this.allEntries = old.allEntries;
             this.dailyEntries = old.dailyEntries;
+            this.startTime = old.startTime;
             old.shutdown();
         }
         this.lock = new ReentrantLock();
         this.locked = false;
-        this.startTime = LocalDateTime.now();
-        this.passivate = passivate;
-        this.passivateLocation = passivateLocation;
-        this.needToPassivate = false;
-        this.passivated = true;
-        if (passivate) {
+        this.persist = persist;
+        this.persistLocation = persistLocation;
+        this.needToPersist = false;
+        this.persisted = true;
+        this.downloadWatchers = new ArrayList<>();
+        if (persist) {
             this.start();
         }
         logger.info("Audit successfully initialised");
     }
 
+    public void addDownloadWatcher(final DownloadWatcher downloadWatcher) {
+        this.downloadWatchers.add(downloadWatcher);
+    }
+
     public void shutdown() {
-        passivate();
+        persist();
         this.interrupt();
     }
 
     @Override
     public void run() {
-        logger.info("Audit thread started, reading initial passivated file");
-        addEntriesToMap(readPassivatedFile(), allEntries);
+        logger.info("Audit thread started, reading initial persisted file");
+        addEntriesToMap(readPersistedFile(), allEntries);
         for (;;) {
             final long current = System.currentTimeMillis();
             // within 30 seconds is close enough
-            if (needToPassivate && current - nextPassivate < 30 * 1000) {
-                passivate();
+            if (needToPersist && current - nextPersist < 30 * 1000) {
+                persist();
             }
-            nextPassivate = System.currentTimeMillis() + passivateInterval;
+            nextPersist = System.currentTimeMillis() + persistInterval;
             try {
-                Thread.sleep(passivateInterval);
+                Thread.sleep(persistInterval);
             } catch (InterruptedException e) {
                 logger.debug("Interrupted", e);
                 break;
@@ -85,28 +113,28 @@ public class Audit extends Thread {
         }
     }
 
-    private synchronized void passivate() {
-        if (!passivate || !needToPassivate) {
-            logger.debug("No need to passivate audit, returning");
+    private synchronized void persist() {
+        if (!persist || !needToPersist) {
+            logger.debug("No need to persist audit, returning");
             return;
         }
-        logger.debug("Passivating audit");
+        logger.debug("Persisting audit");
         lock.lock();
-        final Map<Type, Set<Entry>> map = readPassivatedFile();
-        final int newSize = (int) map.values().stream().flatMap(Collection::stream).count();
-        final int oldSize = (int) allEntries.values().stream().flatMap(Collection::stream).count();
-        if (newSize != oldSize) {
-            addEntriesToMap(allEntries, map);
+        final Map<Type, Set<Entry>> map = readPersistedFile();
+        final int fileSize = (int) map.values().stream().flatMap(Collection::stream).count();
+        final int memorySize = (int) allEntries.values().stream().flatMap(Collection::stream).count();
+        if (fileSize != memorySize) {
+            final int entriesAdded = addEntriesToMap(allEntries, map);
             FileOutputStream fileOut = null;
             ObjectOutputStream out = null;
             try {
-                fileOut = new FileOutputStream(passivateLocation, false);
+                fileOut = new FileOutputStream(persistLocation, false);
                 out = new ObjectOutputStream(fileOut);
                 out.writeObject(map);
                 allEntries.clear();
-                logger.debug("Audit passivated - " + (newSize - oldSize) + " entries added to passivated location");
+                logger.debug("Audit persisted - " + entriesAdded + " entries added to persisted location");
             } catch (IOException e) {
-                final String msg = "Exception writing passivated entries";
+                final String msg = "Exception writing persisted entries";
                 logger.error(msg, e);
                 add(new ErrorEntry(msg, e));
             } finally {
@@ -115,38 +143,57 @@ public class Audit extends Thread {
             }
         }
 
-        needToPassivate = false;
-        passivated = true;
+        needToPersist = false;
+        persisted = true;
         lock.unlock();
     }
 
-    private void addEntriesToMap(final Map<Type, Set<Entry>> newMap, final Map<Type, Set<Entry>> mapToAddTo) {
-        newMap.forEach((type, set) -> mapToAddTo.computeIfAbsent(type, ignore -> new HashSet<>()).addAll(set));
+    private int addEntriesToMap(final Map<Type, Set<Entry>> newMap, final Map<Type, Set<Entry>> mapToAddTo) {
+        return newMap.entrySet().stream()
+                .mapToInt(entry -> {
+                    final Set<Entry> entries = mapToAddTo.computeIfAbsent(entry.getKey(), ignore -> new HashSet<>());
+                    final int oldSize = entries.size();
+                    entries.addAll(entry.getValue());
+                    return entries.size() - oldSize;
+                })
+                .sum();
     }
 
     @SuppressWarnings("unchecked")
-    private Map<Type, Set<Entry>> readPassivatedFile() {
+    private Map<Type, Set<Entry>> readPersistedFile() {
         final Map<Type, Set<Entry>> map = new HashMap<>();
-        if (passivate && passivated && new File(passivateLocation).exists()) {
+        if (persist && persisted && new File(persistLocation).exists()) {
             FileInputStream fileIn = null;
             ObjectInputStream in = null;
             try {
-                fileIn = new FileInputStream(passivateLocation);
+                fileIn = new FileInputStream(persistLocation);
                 in = new ObjectInputStream(fileIn);
                 final Map<Type, Set<Entry>> fromFile = (Map<Type, Set<Entry>>) in.readObject();
                 map.putAll(fromFile);
-                in.close();
-                passivated = false;
-                logger.debug("Read " + (int) allEntries.values().stream().flatMap(Collection::stream).count() + " passivated entries");
+                persisted = false;
+                logger.debug("Read " + (int) allEntries.values().stream().flatMap(Collection::stream).count() + " persisted entries");
+            } catch (InvalidClassException e) {
+                final String msg = "Invalid class detected deserializing - deleting audit. Sorry :(";
+                logger.error(msg, e);
+                add(new ErrorEntry(msg, e));
+                close(in);
+                close(fileIn);
+                try {
+                    Files.delete(Paths.get(persistLocation));
+                } catch (Exception e1) {
+                    final String message = "Error deleting invalid audit";
+                    logger.error(message, e1);
+                    add(new ErrorEntry(message, e1));
+                }
             } catch (IOException | ClassNotFoundException e) {
-                final String msg = "Exception reading passivated entries";
+                final String msg = "Exception reading persisted entries";
                 logger.error(msg, e);
                 add(new ErrorEntry(msg, e));
             } finally {
                 close(in);
                 close(fileIn);
             }
-            needToPassivate = true;
+            needToPersist = true;
         }
         return map;
     }
@@ -164,16 +211,31 @@ public class Audit extends Thread {
     }
 
     public String formatAll() {
-        addEntriesToMap(readPassivatedFile(), allEntries);
+        addEntriesToMap(readPersistedFile(), allEntries);
         final StringBuilder message = new StringBuilder();
         message.append("<html><body>");
         message.append(makeUptime(startTime));
-        for (Type type : types) {
-            if (allEntries.containsKey(type)) {
-                message.append(makeTitle(type));
-                message.append(makeContent(allEntries.get(type)));
-            }
-        }
+        // i really need to rewrite this
+        message.append("<div id=\"status\" style=\"height:200px\"></div>")
+                .append("<script>var prev = \"\";\n" +
+                        "var f = function() {\n" +
+                        "    var req = new XMLHttpRequest();\n" +
+                        "    req.onreadystatechange = function() {\n" +
+                        "        var res = req.responseText;\n" +
+                        "        if (prev !== res) {\n" +
+                        "            document.getElementById(\"status\").innerHTML = res;\n" +
+                        "        }\n" +
+                        "        prev = res;\n" +
+                        "    }\n" +
+                        "    req.open(\"GET\", window.location.href + \"/downloadstatus\", true);\n" +
+                        "    req.send(null);\n" +
+                        "    setTimeout(f, 1000);\n" +
+                        "};\n" +
+                        "setTimeout(f, 1000);</script>");
+        types.stream().filter(allEntries::containsKey).forEachOrdered(type -> {
+            message.append(makeTitle(type));
+            message.append(makeContent(allEntries.get(type)));
+        });
         message.append("</body></html>");
         return String.format(HEADERS, message.length()) + message.toString();
     }
@@ -182,12 +244,10 @@ public class Audit extends Thread {
         final StringBuilder message = new StringBuilder();
         message.append("<html><body>");
         message.append(makeUptime(startTime));
-        for (Type type : types) {
-            if (dailyEntries.containsKey(type)) {
-                message.append(makeTitle(type));
-                message.append(makeContent(dailyEntries.get(type)));
-            }
-        }
+        types.stream().filter(dailyEntries::containsKey).forEachOrdered(type -> {
+            message.append(makeTitle(type));
+            message.append(makeContent(dailyEntries.get(type)));
+        });
         message.append("</body></html>");
         return message.toString();
     }
@@ -251,20 +311,27 @@ public class Audit extends Thread {
         add(entry, dailyEntries);
         final boolean addedToAll = add(entry, allEntries);
         if (addedToAll) {
-            scheduleNextPassivate(System.currentTimeMillis());
+            scheduleNextPersist(System.currentTimeMillis());
         }
         lock.unlock();
     }
 
-    private void scheduleNextPassivate(final long next) {
-        if (passivate && !needToPassivate) {
-            needToPassivate = true;
-            nextPassivate = next + passivateInterval;
-            logger.trace("Passivate scheduled");
+    private void scheduleNextPersist(final long next) {
+        if (persist && !needToPersist) {
+            needToPersist = true;
+            nextPersist = next + persistInterval;
+            logger.trace("persist scheduled");
         }
     }
 
     private boolean add(final Entry entry, final Map<Type, Set<Entry>> map) {
         return map.computeIfAbsent(entry.getType(), ignore -> new HashSet<>()).add(entry);
+    }
+
+    public String getDownloadWatcherStatuses() {
+        return downloadWatchers.stream()
+                .filter(DownloadWatcher::isCurrentlyActive)
+                .map(DownloadWatcher::getMessage)
+                .collect(Collectors.joining("<br />")) + "<br /><br /><br />";
     }
 }

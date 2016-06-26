@@ -4,12 +4,13 @@ import com.carnifex.rsyncmover.audit.Audit;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 
 
 public class NoOp extends MoveOperator {
 
-    protected NoOp(final Audit audit) {
-        super(audit);
+    protected NoOp(final Audit audit, final List<String> additionalArguments) {
+        super(audit, additionalArguments);
     }
 
     @Override

@@ -64,6 +64,9 @@ public class Mover {
         final File file = path.toFile();
         if (file.isDirectory()) {
             final File[] original = file.listFiles();
+            if (original == null) {
+                return false;
+            }
             final long filtered = Stream.of(original).filter(f -> shouldSubmit(f.toPath())).count();
             return filtered != 0 && (partialMatch || original.length == filtered);
         }

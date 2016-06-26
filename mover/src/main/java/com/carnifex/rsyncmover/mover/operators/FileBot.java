@@ -2,6 +2,7 @@ package com.carnifex.rsyncmover.mover.operators;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.DuplicateEntry;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 
 import java.io.BufferedReader;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -34,8 +36,8 @@ public class FileBot extends MoveOperator {
     private final boolean isWindows;
 
     public FileBot(final Audit audit, final List<String> additionalArguments) {
-        super(audit);
-        this.additionalArguments = new ArrayList<>(additionalArguments);
+        super(audit, additionalArguments);
+        this.additionalArguments = new ArrayList<>(additionalArguments != null ? additionalArguments : Collections.emptyList());
         this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         this.pathFindingRegex = Pattern.compile("(.*)\\" + File.separator + "(.*)\\" + File.separator +
                 "..\\" + File.separator + "(.*)\\" + File.separator + "(.*\\..*)");
@@ -92,13 +94,30 @@ public class FileBot extends MoveOperator {
         final String[] argArray = buildArgArray(isDirectory, args);
         logger.trace("Executing \"" + Stream.of(argArray).collect(Collectors.joining(" ")) + "\"");
         final Process exec = Runtime.getRuntime().exec(argArray);
-        final Optional<Path> newPath = findNewPath(new BufferedReader(new InputStreamReader(exec.getInputStream())).lines());
+        final List<String> stdout = new BufferedReader(new InputStreamReader(exec.getInputStream())).lines().collect(Collectors.toList());
+        final Optional<Path> newPath = findNewPath(stdout);
         final String errors = new BufferedReader(new InputStreamReader(exec.getErrorStream())).lines().collect(Collectors.joining("\n"));
         if (errors != null && errors.length() > 0) {
             final String errorString = "Errors returned from filebot: \n" + errors;
             logger.error(errorString);
             audit.add(new ErrorEntry(errorString, null));
         }
+
+        if (!newPath.isPresent()) {
+            // if it already exists, delete the file we moved
+            if (stdout.stream().filter(line -> line.contains("already exists")).count() != 0) {
+                logger.warn("Deleting duplicate file " + to.toString() + " - already moved by filebot");
+                final boolean deleted = Files.deleteIfExists(to);
+                if (deleted) {
+                    audit.add(new DuplicateEntry(to.toString()));
+                } else {
+                    final String msg = "Unable to delete duplicate file " + to.toString();
+                    logger.error(msg);
+                    audit.add(new ErrorEntry(msg));
+                }
+            }
+        }
+
         if (isDirectory) {
             // delete the now empty folder
             if (Files.list(to).count() == 0) {
@@ -137,20 +156,21 @@ public class FileBot extends MoveOperator {
     }
 
     // visible for testing
-    Optional<Path> findNewPath(final Stream<String> output) {
-        final List<String> paths = output.peek(logger::trace)
+    Optional<Path> findNewPath(final List<String> stdout) {
+        final List<String> lines = stdout.stream()
+                .peek(logger::trace)
                 .filter(line -> line.startsWith("[MOVE]"))
                 .map(moveTargetRegex::matcher)
                 .filter(Matcher::find)
                 .map(matcher -> matcher.group(1))
                 .collect(Collectors.toList());
-        if (paths.size() > 0) {
-            final boolean isFolder = paths.get(0).contains(".." + File.separator);
-            if (paths.size() == 1 && !isFolder) {
-                return Optional.of(Paths.get(paths.get(0)));
+        if (lines.size() > 0) {
+            final boolean isFolder = lines.get(0).contains(".." + File.separator);
+            if (lines.size() == 1 && !isFolder) {
+                return Optional.of(Paths.get(lines.get(0)));
             }
             if (isFolder) {
-                final List<String> corrected = paths.stream()
+                final List<String> corrected = lines.stream()
                         .map(path -> {
                             final Matcher matcher = pathFindingRegex.matcher(path);
                             if (matcher.find()) {
@@ -173,7 +193,7 @@ public class FileBot extends MoveOperator {
 
     @Override
     public String getMethod() {
-        return "FileBot";
+        return "filebot";
     }
 
     @Override

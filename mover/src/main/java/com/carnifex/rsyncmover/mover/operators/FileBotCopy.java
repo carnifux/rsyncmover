@@ -13,8 +13,8 @@ public class FileBotCopy extends MoveOperator {
     private final FileBot fileBot;
 
     public FileBotCopy(final Audit audit, final List<String> additionalArguments) {
-        super(audit);
-        this.copy = new Copy(audit);
+        super(audit, additionalArguments);
+        this.copy = new Copy(audit, additionalArguments);
         this.fileBot = new FileBot(audit, additionalArguments);
     }
 

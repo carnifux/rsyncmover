@@ -23,22 +23,22 @@ public class SyncedFiles {
     private static final String SERVER_SEPARATOR = ":::";
 
     private volatile Map<String, Set<String>> synced;
-    private final Path passivateLocation;
+    private final Path persistLocation;
     private volatile boolean passive;
     private final boolean active;
 
-    public SyncedFiles(final Path passivateLocation) {
+    public SyncedFiles(final Path persistLocation) {
         this.synced = new ConcurrentHashMap<>();
-        this.passivateLocation = passivateLocation;
-        if (passivateLocation != null) {
-            final File file = passivateLocation.toFile();
+        this.persistLocation = persistLocation;
+        if (persistLocation != null) {
+            final File file = persistLocation.toFile();
             if (!file.exists()) {
                 boolean create = false;
                 try {
                     create = file.createNewFile();
                 } catch (IOException ignore) {}
                 if (!create) {
-                    logger.error("Could not create passivate file, will not function");
+                    logger.error("Could not create persist file " + persistLocation.toString() + ", will not function");
                     this.active = false;
                     this.passive = false;
                 } else {
@@ -50,7 +50,7 @@ public class SyncedFiles {
                 this.passive = true;
             }
         } else {
-            logger.error("Could not create passivate file, will not function");
+            logger.error("Could not create persist file, will not function");
             this.active = false;
             this.passive = false;
         }
@@ -61,7 +61,7 @@ public class SyncedFiles {
         if (!active) {
             return true;
         }
-        depassivate();
+        depersist();
         return !synced.getOrDefault(serverName, Collections.emptySet()).contains(path);
     }
 
@@ -69,28 +69,28 @@ public class SyncedFiles {
         if (!active) {
             return;
         }
-        depassivate();
+        depersist();
         synced.computeIfAbsent(serverName, ignore -> new HashSet<>()).add(path);
     }
 
     public void finished() {
-        passivate();
+        persist();
     }
 
-    private void passivate() {
+    private void persist() {
         if (!passive && active) {
             synchronized (this) {
                 if (!passive) {
                     if (logger.isDebugEnabled()) {
-                        logger.debug("Passivating " + synced.values().stream().mapToInt(Set::size).sum() + " entries");
+                        logger.debug("Persisting " + synced.values().stream().mapToInt(Set::size).sum() + " entries");
                     }
                     final String collect = synced.entrySet().stream()
                             .flatMap(entry -> entry.getValue().stream().map(set -> entry.getKey() + SERVER_SEPARATOR + set))
                             .sorted().collect(Collectors.joining("\n"));
                     try {
-                        Files.write(passivateLocation, collect.getBytes(), StandardOpenOption.TRUNCATE_EXISTING);
+                        Files.write(persistLocation, collect.getBytes(), StandardOpenOption.TRUNCATE_EXISTING);
                     } catch (Exception e) {
-                        logger.error("Exception encountered passivating downloaded files", e);
+                        logger.error("Exception encountered persisting downloaded files", e);
                     }
                     passive = true;
                 }
@@ -98,21 +98,21 @@ public class SyncedFiles {
         }
     }
 
-    private void depassivate() {
+    private void depersist() {
         if (passive && active) {
             synchronized (this) {
                 if (passive) {
                     try {
                         final Map<String, Set<String>> newSynced = new ConcurrentHashMap<>();
-                        final List<String> entries = Files.readAllLines(passivateLocation);
-                        logger.debug("Depassivated " + entries.size() + " entries");
+                        final List<String> entries = Files.readAllLines(persistLocation);
+                        logger.debug("Depersisted " + entries.size() + " entries");
                         entries.stream().forEach(string -> {
                             final String[] split = string.split(SERVER_SEPARATOR);
                             newSynced.computeIfAbsent(split[0], ignore -> new HashSet<>()).add(split[1]);
                         });
                         synced = newSynced;
                     } catch (Exception e) {
-                        logger.error("Exception encountered depassivating downloaded files", e);
+                        logger.error("Exception encountered depersisting downloaded files", e);
                     }
                     passive = false;
                 }
