@@ -42,6 +42,10 @@ public abstract class MoveOperator {
     public abstract String getMethod();
     public abstract boolean shouldSetFilePermissions();
 
+    protected MoveOperator() {
+        this.audit = null;
+    }
+
     protected MoveOperator(final Audit audit, final List<String> additionalArguments) {
         this.audit = audit;
     }
@@ -119,7 +123,6 @@ public abstract class MoveOperator {
         final Collection<Appender> appenders = context.getRootLogger().getAppenders().values();
         appenders.forEach(appender -> context.getRootLogger().removeAppender(appender));
         try {
-
             final StandardJavaFileManager fm = ToolProvider.getSystemJavaCompiler().getStandardFileManager(null, null, null);
             final Iterable<JavaFileObject> classes = fm.list(StandardLocation.CLASS_PATH, PACKAGE_NAME, Collections.singleton(Kind.CLASS), false);
             classes.forEach(fileObject -> {
@@ -127,9 +130,17 @@ public abstract class MoveOperator {
                     final String[] split = fileObject.getName().replace(".class", "").replace(")", "").split(Pattern.quote(File.separator));
                     final Class<?> clazz = Class.forName(PACKAGE_NAME + "." + split[split.length - 1]);
                     if (MoveOperator.class.isAssignableFrom(clazz) && clazz != MoveOperator.class) {
-                        final Constructor<?> constructor = clazz.getDeclaredConstructor(Audit.class, List.class);
-                        constructor.setAccessible(true);
-                        final MoveOperator op = (MoveOperator) constructor.newInstance(null, null);
+                        MoveOperator op;
+                        try {
+                            final Constructor<?> constructor = clazz.getDeclaredConstructor();
+                            constructor.setAccessible(true);
+                            op = (MoveOperator) constructor.newInstance();
+                        } catch (NoSuchMethodException e) {
+                            logger.trace("No default constructor, ok to use normal constructor", e);
+                            final Constructor<?> constructor = clazz.getDeclaredConstructor(Audit.class, List.class);
+                            constructor.setAccessible(true);
+                            op = (MoveOperator) constructor.newInstance(null, null);
+                        }
                         operators.put(op.getMethod(), (Class<? extends MoveOperator>) clazz);
                     }
                 } catch (Exception e) {

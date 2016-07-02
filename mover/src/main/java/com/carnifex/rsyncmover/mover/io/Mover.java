@@ -57,7 +57,7 @@ public class Mover {
     }
 
     public Path getTarget(final Path path) {
-        return Paths.get(target.getPath(path.getFileName().toString()) + File.separator + path.getFileName().toString());
+        return Paths.get(target.getPath(path.getFileName().toString()));
     }
 
     public boolean shouldSubmit(final Path path) {
@@ -91,7 +91,7 @@ public class Mover {
         return priority;
     }
 
-    private static final class Target {
+    public static final class Target {
 
         private static final Pattern timeRegex = Pattern.compile("(.*?)((?:\\$.+?\\$)|(?:%.+?%.+?%))(.*)");
         private static final Pattern regexRegex = Pattern.compile("%(.+?)%(.+?)%");
@@ -106,7 +106,7 @@ public class Mover {
 
         public String getPath(final String filename) {
             if (partialPaths.size() == 1) {
-                return partialPaths.get(0);
+                return partialPaths.get(0) + File.separator + filename;
             }
 
             return partialPaths.stream()
@@ -131,7 +131,7 @@ public class Mover {
                         }
                         return path;
                     })
-                    .collect(Collectors.joining());
+                    .collect(Collectors.joining()) + File.separator + filename;
         }
 
         private List<String> getRegexPair(final String input) {

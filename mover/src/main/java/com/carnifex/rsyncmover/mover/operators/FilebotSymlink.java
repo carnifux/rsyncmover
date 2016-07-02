@@ -13,11 +13,17 @@ public class FileBotSymlink extends MoveOperator {
     private final FileBot fileBot;
     private final Symlink symlink;
 
-    public FileBotSymlink(final Audit audit, final List<String> additionalArguments) {
+    private FileBotSymlink() {
+        this.move = null;
+        this.fileBot = null;
+        this.symlink = null;
+    }
+
+    private FileBotSymlink(final Audit audit, final List<String> additionalArguments) {
         super(audit, additionalArguments);
-        this.move = new Move(audit, additionalArguments);
-        this.fileBot = new FileBot(audit, additionalArguments);
-        this.symlink = new Symlink(audit, additionalArguments);
+        this.move = (Move) MoveOperator.create("move", additionalArguments, audit);
+        this.fileBot = (FileBot) MoveOperator.create("filebot", additionalArguments, audit);
+        this.symlink = (Symlink) MoveOperator.create("symlink", additionalArguments, audit);
     }
 
     @Override

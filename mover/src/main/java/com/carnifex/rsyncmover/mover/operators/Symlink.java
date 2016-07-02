@@ -10,7 +10,7 @@ import java.util.List;
 
 public class Symlink extends MoveOperator {
 
-    public Symlink(final Audit audit, final List<String> additionalArguments) {
+    private Symlink(final Audit audit, final List<String> additionalArguments) {
         super(audit, additionalArguments);
     }
 

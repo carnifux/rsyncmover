@@ -11,7 +11,7 @@ import java.util.List;
 
 public class Move extends MoveOperator {
 
-    public Move(final Audit audit, final List<String> additionalArguments) {
+    private Move(final Audit audit, final List<String> additionalArguments) {
         super(audit, additionalArguments);
     }
 

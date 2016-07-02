@@ -35,21 +35,25 @@ public class FileBot extends MoveOperator {
     private final Pattern pathFindingRegex;
     private final boolean isWindows;
 
-    public FileBot(final Audit audit, final List<String> additionalArguments) {
+    private FileBot() {
+        this.additionalArguments = null;
+        this.pathFindingRegex = null;
+        this.isWindows = false;
+    }
+
+    private FileBot(final Audit audit, final List<String> additionalArguments) {
         super(audit, additionalArguments);
         this.additionalArguments = new ArrayList<>(additionalArguments != null ? additionalArguments : Collections.emptyList());
         this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         this.pathFindingRegex = Pattern.compile("(.*)\\" + File.separator + "(.*)\\" + File.separator +
                 "..\\" + File.separator + "(.*)\\" + File.separator + "(.*\\..*)");
-        {
-            final Iterator<String> iter = this.additionalArguments.iterator();
-            while (iter.hasNext()) {
-                final String next = iter.next();
-                if (next.contains("filebot")) {
-                    iter.remove();
-                    filebotPath = next;
-                    break;
-                }
+        final Iterator<String> iter = this.additionalArguments.iterator();
+        while (iter.hasNext()) {
+            final String next = iter.next();
+            if (next.contains("filebot")) {
+                iter.remove();
+                filebotPath = next;
+                break;
             }
         }
         final List<String> containsFormat = this.additionalArguments.stream().filter(arg -> arg.contains("format")).collect(Collectors.toList());

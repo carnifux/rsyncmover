@@ -12,10 +12,15 @@ public class MoveSymlink extends MoveOperator {
     private final Move move;
     private final Symlink symlink;
 
-    public MoveSymlink(final Audit audit, final List<String> additionalArguments) {
+    private MoveSymlink() {
+        this.move = null;
+        this.symlink = null;
+    }
+
+    private MoveSymlink(final Audit audit, final List<String> additionalArguments) {
         super(audit, additionalArguments);
-        this.move = new Move(audit, additionalArguments);
-        this.symlink = new Symlink(audit, additionalArguments);
+        this.move = (Move) MoveOperator.create("move", additionalArguments, audit);
+        this.symlink = (Symlink) MoveOperator.create("symlink", additionalArguments, audit);
     }
 
     @Override

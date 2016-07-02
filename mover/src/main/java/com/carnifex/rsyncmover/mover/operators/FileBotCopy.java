@@ -12,10 +12,15 @@ public class FileBotCopy extends MoveOperator {
     private final Copy copy;
     private final FileBot fileBot;
 
-    public FileBotCopy(final Audit audit, final List<String> additionalArguments) {
+    private FileBotCopy() {
+        this.copy = null;
+        this.fileBot = null;
+    }
+
+    private FileBotCopy(final Audit audit, final List<String> additionalArguments) {
         super(audit, additionalArguments);
-        this.copy = new Copy(audit, additionalArguments);
-        this.fileBot = new FileBot(audit, additionalArguments);
+        this.copy = (Copy) MoveOperator.create("copy", additionalArguments, audit);
+        this.fileBot = (FileBot) MoveOperator.create("filebot", additionalArguments, audit);
     }
 
     @Override

@@ -51,6 +51,12 @@ public class MoverThread extends Thread {
                 if (poll != null) {
                     moving = true;
                     move(poll);
+                    final int remaining = pathObjectQueue.size();
+                    if (remaining > 0) {
+                        logger.info(remaining + " items to move");
+                    } else {
+                        logger.info("Finished moving files");
+                    }
                 }
             } catch (InterruptedException e) {
                 logger.debug("MoverThread interrupted", e);

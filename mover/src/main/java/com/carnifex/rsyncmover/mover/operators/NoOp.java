@@ -9,7 +9,7 @@ import java.util.List;
 
 public class NoOp extends MoveOperator {
 
-    protected NoOp(final Audit audit, final List<String> additionalArguments) {
+    private NoOp(final Audit audit, final List<String> additionalArguments) {
         super(audit, additionalArguments);
     }
 

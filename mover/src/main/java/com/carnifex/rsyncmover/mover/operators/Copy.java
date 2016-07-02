@@ -11,7 +11,7 @@ import java.util.List;
 
 public class Copy extends MoveOperator {
 
-    public Copy(final Audit audit, final List<String> additionalArguments) {
+    private Copy(final Audit audit, final List<String> additionalArguments) {
         super(audit, additionalArguments);
     }
 
