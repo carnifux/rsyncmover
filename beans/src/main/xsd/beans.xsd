@@ -24,6 +24,13 @@
                                     <xs:documentation>enable moving of files</xs:documentation>
                                 </xs:annotation>
                             </xs:element>
+                            <xs:element type="xs:boolean" name="lazyPolling" default="false">
+                                <xs:annotation>
+                                    <xs:documentation>only works if servers also enabled - servers tell movers when to expect files
+                                    movers dont look themselves
+                                    reduces drive reads</xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
                             <xs:element type="xs:boolean" name="deleteDuplicateFiles" default="false">
                                 <xs:annotation>
                                     <xs:documentation>deletes files from the watch directory if they already exist where they're being moved to</xs:documentation>

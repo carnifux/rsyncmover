@@ -27,19 +27,23 @@ public class FileWatcher extends Thread {
     private final WatchService watcher;
     private final Set<String> dontWatch;
     private final FileChangeWatcher fileChangeWatcher;
+    private final boolean lazyPolling;
     private final Audit audit;
 
-    public FileWatcher(final String dir, final Set<String> dontWatch, final FileChangeWatcher fileChangeWatcher, final Audit audit) {
+    public FileWatcher(final String dir, final Set<String> dontWatch, final FileChangeWatcher fileChangeWatcher, final boolean lazyPolling, final Audit audit) {
         super("FileWatcher - " + dir);
         this.dir = Paths.get(dir);
         this.dontWatch = dontWatch;
         this.fileChangeWatcher = fileChangeWatcher;
         this.audit = audit;
+        this.lazyPolling = lazyPolling;
         if (!this.dir.toFile().exists() || !this.dir.toFile().canRead()) {
             final String msg = "Watch folder " + dir + " does not exist or is unreadable, will not be watched";
             logger.error(msg);
             audit.add(new ErrorEntry(msg, null));
             watcher = null;
+        } else if (lazyPolling) {
+            this.watcher = null;
         } else {
             try {
                 this.watcher = FileSystems.getDefault().newWatchService();
@@ -54,7 +58,7 @@ public class FileWatcher extends Thread {
 
     @Override
     public void run() {
-        initialMove();
+        submitExistingFiles();
         for (;;) {
 
             // wait for key to be signaled
@@ -110,11 +114,11 @@ public class FileWatcher extends Thread {
 
     }
 
-    private void initialMove() {
+    public void submitExistingFiles() {
         // check that any files already existing in the folder need moving
         final File[] files = dir.toFile().listFiles();
         if (files != null && files.length > 0) {
-            logger.info("Submitting pre-existing initial files in " + dir);
+            logger.info("Submitting existing initial files in " + dir);
             for (final File file : files) {
                 fileChangeWatcher.submit(file.toPath());
             }

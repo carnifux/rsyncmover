@@ -18,7 +18,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class Ssh {
+public class Sftp {
 
     private static final Logger logger = LogManager.getLogger();
 
@@ -32,9 +32,9 @@ public class Ssh {
     private final Set<PosixFilePermission> filePermissions;
     private final DownloadWatcher watcher;
 
-    public Ssh(final String server, final int port, final String remoteDirectory, final String remoteRealDirectory,
-               final String user, final String pass, final String hostKey,
-               final Set<PosixFilePermission> filePermissions) {
+    public Sftp(final String server, final int port, final String remoteDirectory, final String remoteRealDirectory,
+                final String user, final String pass, final String hostKey,
+                final Set<PosixFilePermission> filePermissions) {
         this.server = server;
         this.port = port;
         this.remoteDirectory = remoteDirectory;
@@ -44,7 +44,7 @@ public class Ssh {
         this.hostKey = hostKey;
         this.filePermissions = filePermissions;
         this.watcher = new DownloadWatcher();
-        logger.info("Ssh client for server " + server + ":" + port + ", monitoring " + remoteDirectory + " successfully initialized");
+        logger.info("Sftp client for server " + server + ":" + port + ", monitoring " + remoteDirectory + " successfully initialized");
     }
 
     public DownloadWatcher getDownloadWatcher() {
@@ -56,7 +56,8 @@ public class Ssh {
     }
 
     public List<String> listFiles() {
-        try (final SFTPClient sftp = new SshClient().getSftp()) {
+        try (final SshClient sshClient = new SshClient();
+             final SFTPClient sftp = sshClient.getSftp()) {
             final List<RemoteResourceInfo> ls = sftp.ls(remoteDirectory);
             return ls.stream()
                     .map(RemoteResourceInfo::getName)
@@ -74,7 +75,9 @@ public class Ssh {
         if (files.isEmpty()) {
             return;
         }
-        try (final SFTPClient sftp = new SshClient().getSftp()) {
+
+        try (final SshClient sshClient = new SshClient();
+             final SFTPClient sftp = sshClient.getSftp()) {
             for (final String file : files) {
                 final String source = remoteDirectory + file;
                 try {
@@ -107,6 +110,7 @@ public class Ssh {
 
     private final class SshClient implements AutoCloseable {
         private final SSHClient ssh;
+        private SFTPClient client;
 
         public SshClient() {
             this.ssh = new SSHClient();
@@ -128,7 +132,7 @@ public class Ssh {
 
         public SFTPClient getSftp() {
             try {
-                final SFTPClient client = ssh.newSFTPClient();
+                client = ssh.newSFTPClient();
                 client.getFileTransfer().setTransferListener(new TransferListener() {
                     @Override
                     public TransferListener directory(final String name) {
@@ -151,6 +155,9 @@ public class Ssh {
         @Override
         public void close() throws Exception {
             this.ssh.close();
+            if (client != null) {
+                client.close();
+            }
         }
     }
 

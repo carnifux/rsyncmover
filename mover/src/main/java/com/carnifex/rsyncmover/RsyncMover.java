@@ -10,7 +10,7 @@ import com.carnifex.rsyncmover.mover.io.FileChangeWatcher;
 import com.carnifex.rsyncmover.mover.io.FileWatcher;
 import com.carnifex.rsyncmover.mover.io.Mover;
 import com.carnifex.rsyncmover.mover.io.MoverThread;
-import com.carnifex.rsyncmover.sync.Ssh;
+import com.carnifex.rsyncmover.sync.Sftp;
 import com.carnifex.rsyncmover.sync.SyncedFiles;
 import com.carnifex.rsyncmover.sync.Syncer;
 import com.carnifex.rsyncmover.web.Server;
@@ -67,9 +67,9 @@ public class RsyncMover {
         }
 
         if (config.downloadFiles()) {
-            final List<Ssh> sshs = initSshs(config);
-            final Syncer syncer = initSyncer(config, movers, sshs, audit);
-            components.putIfAbsent(Ssh.class, sshs);
+            final List<Sftp> sftps = initSshs(config);
+            final Syncer syncer = initSyncer(config, movers, sftps, audit);
+            components.putIfAbsent(Sftp.class, sftps);
             components.putIfAbsent(Syncer.class, syncer);
             logger.info("File downloading successfully initiated");
         }
@@ -82,15 +82,15 @@ public class RsyncMover {
         emailers.forEach(Thread::start);
 
         if (config.runServer()) {
-            final Server server = new Server(config.getPort(), audit);
+            final Server server = new Server(config.getPort(), (Syncer) components.get(Syncer.class), audit);
             components.putIfAbsent(Server.class, server);
         }
     }
 
-    private static List<Ssh> initSshs(final Config config) {
+    private static List<Sftp> initSshs(final Config config) {
         return config.getServers().stream()
             .flatMap(server -> server.getDirectories().getDirectory().stream()
-                    .map(dir -> new Ssh(server.getHost(), server.getPort(),
+                    .map(dir -> new Sftp(server.getHost(), server.getPort(),
                             dir.getDirectory(), dir.getRealDirectory(), server.getUser(), server.getPass(),
                             server.getHostKey(), config.getFilePermissions())))
             .collect(Collectors.toList());
@@ -116,7 +116,7 @@ public class RsyncMover {
             fileChangeWatcher.interrupt();
         }
         if (components.containsKey(Syncer.class)) {
-            final List<Ssh> sshs = (List<Ssh>) components.remove(Ssh.class);
+            final List<Sftp> sftps = (List<Sftp>) components.remove(Sftp.class);
             final Syncer syncer = (Syncer) components.remove(Syncer.class);
             syncer.shutdown();
         }
@@ -137,7 +137,7 @@ public class RsyncMover {
     private static List<FileWatcher> initFileWatchers(final Config config, final MoverThread moverThread, final FileChangeWatcher fileChangeWatcher, final Audit audit) {
         final List<FileWatcher> watchers = config.getWatchDir().stream().map(watch -> new FileWatcher(watch,
                 asSet(config.getPassivateLocation(), config.getAuditPassivateLocation()),
-                fileChangeWatcher, audit)).collect(Collectors.toList());
+                fileChangeWatcher, config.isLazyPolling(), audit)).collect(Collectors.toList());
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
@@ -149,11 +149,12 @@ public class RsyncMover {
         return watchers;
     }
 
-    private static Syncer initSyncer(final Config config, final List<Mover> movers, final List<Ssh> sshs, final Audit audit) {
+    @SuppressWarnings("unchecked")
+    private static Syncer initSyncer(final Config config, final List<Mover> movers, final List<Sftp> sftps, final Audit audit) {
         final SyncedFiles syncedFiles = new SyncedFiles(Paths.get(config.getPassivateLocation()));
-        final Syncer syncer = new Syncer(config.getWatchDir(), sshs, syncedFiles, config.getSyncFrequency(),
+        final Syncer syncer = new Syncer(config.getWatchDir(), sftps, syncedFiles, config.getSyncFrequency(),
                 config.shouldDepassivateEachTime(), config.getMinimumFreeSpaceForDownload(), config.getFilePermissions(),
-                config.downloadsMustMatchMover(), movers, audit);
+                config.downloadsMustMatchMover(), movers, config.isLazyPolling(), (List<FileWatcher>) components.get(FileWatcher.class), audit);
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {

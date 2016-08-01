@@ -1,5 +1,6 @@
 package com.carnifex.rsyncmover.audit.entry;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -23,5 +24,12 @@ public class MovedEntryTest {
     public void format_filebot_folders() throws Exception {
         final MovedEntry entry = new MovedEntry("D:\\dl\\Silicon.Valley.S03E01.720p.HDTV.x264-SVA.mkv", "D:\\tv\\Silicon Valley\\Season 3\\Silicon Valley - 3x01 - Founder Friendly.mkv", "filebot+move");
         assertEquals("filebot+move: Silicon.Valley.S03E01.720p.HDTV.x264-SVA.mkv -> \\tv\\Silicon Valley\\Season 3\\Silicon Valley - 3x01 - Founder Friendly.mkv", entry.format());
+    }
+
+    @Test
+    @Ignore
+    public void format_music() throws Exception {
+        final MovedEntry move = new MovedEntry("\\dl\\folder", "\\music\\_unsorted\\new2016\\folder", "move");
+        assertEquals("_unsorted\\new2016", move.format());
     }
 }

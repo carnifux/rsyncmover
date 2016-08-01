@@ -88,6 +88,10 @@ public class Config {
         return config.getEmailSummary();
     }
 
+    public boolean isLazyPolling() {
+        return config.getServers().isDownloadFiles() && config.getMovers().isLazyPolling();
+    }
+
     public Set<PosixFilePermission> getFilePermissions() {
         final String permissions = config.getMovers().getMovedFilePermissions();
         return permissions != null ? PosixFilePermissions.fromString(permissions) : null;

@@ -2,7 +2,7 @@ package com.carnifex.rsyncmover.audit;
 
 import com.carnifex.rsyncmover.audit.entry.Entry;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
-import com.carnifex.rsyncmover.sync.Ssh.DownloadWatcher;
+import com.carnifex.rsyncmover.sync.Sftp.DownloadWatcher;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -231,7 +231,16 @@ public class Audit extends Thread {
                         "    req.send(null);\n" +
                         "    setTimeout(f, 1000);\n" +
                         "};\n" +
-                        "setTimeout(f, 1000);</script>");
+                        "setTimeout(f, 1000);\n" +
+                        "\n" +
+                        "var callSync = function() {\n" +
+                        "   var req = new XMLHttpRequest();\n" +
+                        "   req.open(\"GET\", window.location.href + \"/checkservers\", true);\n" +
+                        "   req.send(null);\n" +
+                        "   setTimeout(location.reload(), 500);\n" +
+                        "};\n" +
+                        "</script>");
+        message.append("<button onclick=\"callSync()\">Check Servers</button>");
         types.stream().filter(allEntries::containsKey).forEachOrdered(type -> {
             message.append(makeTitle(type));
             message.append(makeContent(allEntries.get(type)));
@@ -245,8 +254,8 @@ public class Audit extends Thread {
         message.append("<html><body>");
         message.append(makeUptime(startTime));
         types.stream().filter(dailyEntries::containsKey).forEachOrdered(type -> {
-            message.append(makeTitle(type));
-            message.append(makeContent(dailyEntries.get(type)));
+            message.append(makeEmailTitle(type));
+            message.append(makeEmailContent(dailyEntries.get(type)));
         });
         message.append("</body></html>");
         return message.toString();
@@ -286,7 +295,16 @@ public class Audit extends Thread {
                 .sorted(Comparator.reverseOrder()).collect(Collectors.joining("<br />"));
     }
 
+    private String makeEmailContent(final Set<Entry> strings) {
+        return strings.stream().map(entry -> entry.getCreatedAt().toString() + ": " + entry.format())
+                .sorted(Comparator.reverseOrder()).collect(Collectors.joining("<br />"));
+    }
+
     private String makeTitle(final Type type) {
+        return "<br />================" + type.toString() + "================<br /><br />";
+    }
+
+    private String makeEmailTitle(final Type type) {
         return "<br />================" + type.toString() + "================<br /><br />";
     }
 

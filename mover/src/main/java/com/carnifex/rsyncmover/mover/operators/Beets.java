@@ -111,7 +111,9 @@ public class Beets extends MoveOperator {
     }
 
     private String preparePath(final Path to) {
-        return isWindows ? "\"" + to.toString() + "\"" : to.toString().replaceAll(" ", "\\ ");
+        // operate on the parent directory so it will rename it
+        final Path parent = to.getParent();
+        return isWindows ? "\"" + parent.toString() + "\"" : parent.toString().replaceAll(" ", "\\ ");
     }
 
     @Override

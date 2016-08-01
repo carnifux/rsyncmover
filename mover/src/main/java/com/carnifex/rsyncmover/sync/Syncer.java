@@ -5,6 +5,7 @@ import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.audit.entry.DownloadedEntry;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 import com.carnifex.rsyncmover.audit.entry.SeenEntry;
+import com.carnifex.rsyncmover.mover.io.FileWatcher;
 import com.carnifex.rsyncmover.mover.io.Mover;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -27,44 +28,55 @@ public class Syncer extends Thread {
 
     private final List<String> dlDirs;
     private final SyncedFiles syncedFiles;
-    private final List<Ssh> sshs;
+    private final List<Sftp> sftps;
     private final int syncFrequency;
     private final boolean passivateEachTime;
     private volatile boolean running;
     private volatile boolean sleeping;
+    private volatile boolean syncing;
     private final List<Mover> movers;
     private final long minimumSpace;
     private final Set<PosixFilePermission> filePermissions;
+    private final boolean lazyPolling;
+    private final List<FileWatcher> fileWatchers;
     private final Audit audit;
 
-    public Syncer(final List<String> dlDirs, final List<Ssh> sshs, final SyncedFiles syncedFiles, final int syncFrequency,
+    public Syncer(final List<String> dlDirs, final List<Sftp> sftps, final SyncedFiles syncedFiles, final int syncFrequency,
                   final boolean passivateEachTime, final long minimumSpace, final Set<PosixFilePermission> filePermissions,
-                  final boolean downloadsMustMatchMover, final List<Mover> movers, final Audit audit) {
+                  final boolean downloadsMustMatchMover, final List<Mover> movers, final boolean lazyPolling, final List<FileWatcher> fileWatchers, final Audit audit) {
         super("Syncer");
         this.dlDirs = dlDirs;
         this.syncedFiles = syncedFiles;
-        this.sshs = sshs;
-        this.sshs.forEach(ssh -> audit.addDownloadWatcher(ssh.getDownloadWatcher()));
+        this.sftps = sftps;
+        this.sftps.forEach(ssh -> audit.addDownloadWatcher(ssh.getDownloadWatcher()));
         this.syncFrequency = syncFrequency;
         this.passivateEachTime = passivateEachTime;
         this.movers = downloadsMustMatchMover ? movers : Collections.emptyList();
         this.minimumSpace = minimumSpace;
         this.audit = audit;
         this.filePermissions = filePermissions;
+        this.lazyPolling = lazyPolling;
+        this.fileWatchers = fileWatchers != null ? fileWatchers : Collections.emptyList();
 
         this.running = true;
         this.sleeping = false;
+        this.syncing = false;
         this.start();
     }
 
-    private void sync() {
-        for (final Ssh ssh : sshs) {
+    public void sync() {
+        if (syncing) {
+            return;
+        }
+        syncing = true;
+        boolean downloaded = false;
+        for (final Sftp sftp : sftps) {
             try {
-                final List<String> allFiles = ssh.listFiles();
-                logger.debug("Received following files from ssh: " + allFiles.stream().map(this::normalize).collect(Collectors.joining(", ")));
+                final List<String> allFiles = sftp.listFiles();
+                logger.debug("Received following files from sftp: " + allFiles.stream().map(this::normalize).collect(Collectors.joining(", ")));
                 final List<String> shouldDownload = allFiles.stream()
-                        .peek(file -> audit.add(new SeenEntry(normalize(file), ssh.getServerName())))
-                        .filter(file -> syncedFiles.shouldDownload(ssh.getServerName(), normalize(file)))
+                        .peek(file -> audit.add(new SeenEntry(normalize(file), sftp.getServerName())))
+                        .filter(file -> syncedFiles.shouldDownload(sftp.getServerName(), normalize(file)))
                         .filter(file -> {
                             final boolean result = this.movers.isEmpty() || this.movers.stream().filter(mover -> mover.shouldSubmit(Paths.get(file))).count() == 1;
                             if (!result) {
@@ -80,7 +92,7 @@ public class Syncer extends Thread {
                     logger.info("Downloading following files, as haven't been seen before: " +
                             shouldDownload.stream().map(this::normalize).collect(Collectors.joining(",")));
                     final String dlDir = getDlDir();
-                    ssh.downloadFiles(shouldDownload, dlDir, path -> {
+                    sftp.downloadFiles(shouldDownload, dlDir, path -> {
                         if (filePermissions != null) {
                             try {
                                 Files.setPosixFilePermissions(Paths.get(dlDir + File.separator + path), filePermissions);
@@ -90,9 +102,10 @@ public class Syncer extends Thread {
                                 audit.add(new ErrorEntry(msg, e));
                             }
                         }
-                        syncedFiles.addDownloadedPath(ssh.getServerName(), normalize(path));
-                        audit.add(new DownloadedEntry(path, ssh.getServerName()));
+                        syncedFiles.addDownloadedPath(sftp.getServerName(), normalize(path));
+                        audit.add(new DownloadedEntry(path, sftp.getServerName()));
                     });
+                    downloaded = true;
                 }
             } catch (Exception e) {
                 final String msg = "Exception downloading or listing files";
@@ -104,6 +117,10 @@ public class Syncer extends Thread {
         if (passivateEachTime) {
             syncedFiles.finished();
         }
+        if (downloaded && lazyPolling) {
+            fileWatchers.forEach(fw -> fw.submitExistingFiles());
+        }
+        syncing = false;
     }
 
     private String normalize(final String text) {
@@ -140,6 +157,13 @@ public class Syncer extends Thread {
                 logger.debug("Interrupted", e);
             }
             sleeping = false;
+        }
+    }
+
+    @Override
+    public void interrupt() {
+        if (sleeping && !syncing) {
+            super.interrupt();
         }
     }
 
