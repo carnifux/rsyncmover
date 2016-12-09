@@ -73,23 +73,23 @@ public class Syncer extends Thread {
         for (final Sftp sftp : sftps) {
             try {
                 final List<String> allFiles = sftp.listFiles();
-                logger.debug("Received following files from sftp: " + allFiles.stream().map(this::normalize).collect(Collectors.joining(", ")));
+                logger.debug(sftp.getServerName() + ": Received following files from sftp: " + allFiles.stream().map(this::normalize).collect(Collectors.joining(", ")));
                 final List<String> shouldDownload = allFiles.stream()
                         .peek(file -> audit.add(new SeenEntry(normalize(file), sftp.getServerName())))
                         .filter(file -> syncedFiles.shouldDownload(sftp.getServerName(), normalize(file)))
                         .filter(file -> {
                             final boolean result = this.movers.isEmpty() || this.movers.stream().filter(mover -> mover.shouldSubmit(Paths.get(file))).count() == 1;
                             if (!result) {
-                                logger.warn("Not downloading " + file + ", no single mover able to match it");
+                                logger.warn(sftp.getServerName() + ": Not downloading " + file + ", no single mover able to match it");
                             }
                             return result;
                         })
                         .collect(Collectors.toList());
 
                 if (shouldDownload.isEmpty()) {
-                    logger.info("Nothing new to download, finishing");
+                    logger.info(sftp.getServerName() + ": Nothing new to download, finishing");
                 } else {
-                    logger.info("Downloading following files, as haven't been seen before: " +
+                    logger.info(sftp.getServerName() + ": Downloading following files, as haven't been seen before: " +
                             shouldDownload.stream().map(this::normalize).collect(Collectors.joining(",")));
                     final String dlDir = getDlDir();
                     sftp.downloadFiles(shouldDownload, dlDir, path -> {
@@ -97,7 +97,7 @@ public class Syncer extends Thread {
                             try {
                                 Files.setPosixFilePermissions(Paths.get(dlDir + File.separator + path), filePermissions);
                             } catch (Exception e) {
-                                final String msg = "Error setting file permissions on downloaded files";
+                                final String msg = sftp.getServerName() + ": Error setting file permissions on downloaded files";
                                 logger.error(msg, e);
                                 audit.add(new ErrorEntry(msg, e));
                             }
@@ -108,7 +108,7 @@ public class Syncer extends Thread {
                     downloaded = true;
                 }
             } catch (Exception e) {
-                final String msg = "Exception downloading or listing files";
+                final String msg = sftp.getServerName() + ": Exception downloading or listing files";
                 logger.error(msg, e);
                 audit.add(new ErrorEntry(msg, e));
             }

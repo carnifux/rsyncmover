@@ -2,12 +2,23 @@
 <Configuration status="info">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+            <PatternLayout pattern="%d{DATE} [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
+        <RollingFile name="file" fileName="logs/rsyncMover.log" filePattern="logs/rsyncMover-%d{yyyy-MM-dd}-%i.log" append="true">
+            <PatternLayout pattern="%d{DATE} [%t] %-5level %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="24" modulate="true"/>
+                <SizeBasedTriggeringPolicy/>
+            </Policies>
+            <DefaultRolloverStrategy/>
+        </RollingFile>
     </Appenders>
     <Loggers>
         <Root level="trace">
             <AppenderRef ref="Console"/>
         </Root>
+        <Logger name="com.carnifex" level="info" additivity="true">
+            <AppenderRef ref="file"/>
+        </Logger>
     </Loggers>
 </Configuration>

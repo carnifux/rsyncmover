@@ -110,7 +110,7 @@ public class FileChangeWatcher extends Thread {
         if (movers.size() == 1) {
             return movers.get(0);
         }
-        final List<Mover> priorities = movers.stream().sorted((a, b) -> b.getPriority() - a.getPriority()).collect(Collectors.toList());
+        final List<Mover> priorities = movers.stream().sorted((a, b) -> -Integer.compare(a.getPriority(), b.getPriority())).collect(Collectors.toList());
         // if one has a higher priority than any of the others, then return that, otherwise we can't decide on a mover
         if (priorities.get(0).getPriority() > priorities.get(1).getPriority()) {
             return priorities.get(0);

@@ -239,8 +239,23 @@ public class Audit extends Thread {
                         "   req.send(null);\n" +
                         "   setTimeout(location.reload(), 500);\n" +
                         "};\n" +
+                        "\n" +
+                                "var testMover = function() {\n" +
+                                "    var req = new XMLHttpRequest();\n" +
+                                "    var value = document.getElementById(\"testmover\").value;" +
+                                "    req.onreadystatechange = function() {\n" +
+                                "        var res = req.responseText;\n" +
+                                "        if (prev !== res) {\n" +
+                                "            document.getElementById(\"testmoverdiv\").innerHTML = res;\n" +
+                                "        }\n" +
+                                "        prev = res;\n" +
+                                "    }\n" +
+                                "    req.open(\"POST\", window.location.href + \"/findmoverfor\", true);\n" +
+                                "    req.send(value);\n" +
+                                "}"+
                         "</script>");
         message.append("<button onclick=\"callSync()\">Check Servers</button>");
+        message.append("<div id=\"testmoverdiv\"></div>\n").append("<input type=\"text\" id=\"testmover\" /><button onclick=\"testMover()\">Test Mover</button>");
         types.stream().filter(allEntries::containsKey).forEachOrdered(type -> {
             message.append(makeTitle(type));
             message.append(makeContent(allEntries.get(type)));

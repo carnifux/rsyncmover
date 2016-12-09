@@ -82,7 +82,7 @@ public class RsyncMover {
         emailers.forEach(Thread::start);
 
         if (config.runServer()) {
-            final Server server = new Server(config.getPort(), (Syncer) components.get(Syncer.class), audit);
+            final Server server = new Server(config.getPort(), (Syncer) components.get(Syncer.class), movers, audit);
             components.putIfAbsent(Server.class, server);
         }
     }
