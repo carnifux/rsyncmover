@@ -9,6 +9,9 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.LoggerConfig;
 
+import javax.xml.bind.annotation.XmlElement;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.LocalTime;
@@ -51,7 +54,8 @@ public class Config {
     }
 
     public boolean killDownloadOnExit() {
-        return config.getServers().isKillDownloadOnExit();
+        final Boolean killDownloadOnExit = config.getServers().isKillDownloadOnExit();
+        return killDownloadOnExit == null ? getDefault(config.getServers(), "isKillDownloadOnExit", boolean.class) : killDownloadOnExit;
     }
 
     public String getMoverPassivateLocation() {
@@ -63,7 +67,8 @@ public class Config {
     }
 
     public boolean downloadsMustMatchMover() {
-        return config.getServers().isMustMatchMoverForDownload();
+        final Boolean mustMatchMoverForDownload = config.getServers().isMustMatchMoverForDownload();
+        return mustMatchMoverForDownload == null ? getDefault(config.getServers(), "isMustMatchMoverForDownload", boolean.class) : mustMatchMoverForDownload;
     }
 
     public List<Server> getServers() {
@@ -75,7 +80,8 @@ public class Config {
     }
 
     public int getSyncFrequency() {
-        return config.getServers().getUpdateIntervalMinutes() * 60 * 1000;
+        final Integer updateIntervalMinutes = config.getServers().getUpdateIntervalMinutes();
+        return (updateIntervalMinutes == null ? getDefault(config.getServers(), "getUpdateIntervalMinutes", int.class) : updateIntervalMinutes) * 60 * 1000;
     }
 
     public String getPassivateLocation() {
@@ -91,7 +97,8 @@ public class Config {
     }
 
     public boolean shouldDepassivateEachTime() {
-        return config.getServers().isDepassivateEachTime();
+        final Boolean depassivateEachTime = config.getServers().isDepassivateEachTime();
+        return depassivateEachTime == null ? getDefault(config.getServers(), "isDepassivateEachTime", boolean.class) : depassivateEachTime;
     }
 
     public RsyncMover.EmailSummary getEmail() {
@@ -99,7 +106,8 @@ public class Config {
     }
 
     public boolean isLazyPolling() {
-        return config.getServers().isDownloadFiles() && config.getMovers().isLazyPolling();
+        final Boolean lazyPolling = config.getMovers().isLazyPolling();
+        return config.getServers().isDownloadFiles() && lazyPolling == null ? getDefault(config.getMovers(), "isLazyPolling", boolean.class) : lazyPolling;
     }
 
     public Set<PosixFilePermission> getFilePermissions() {
@@ -108,7 +116,8 @@ public class Config {
     }
 
     public boolean shouldPassivateAudit() {
-        return config.getAudit().isPassivate();
+        final Boolean passivate = config.getAudit().isPassivate();
+        return passivate == null ? getDefault(config.getAudit(), "isPassivate", boolean.class) : passivate;
     }
 
     public String getAuditPassivateLocation() {
@@ -116,7 +125,8 @@ public class Config {
     }
 
     public boolean getDeleteDuplicateFiles() {
-        return config.getMovers().isDeleteDuplicateFiles();
+        final Boolean deleteDuplicateFiles = config.getMovers().isDeleteDuplicateFiles();
+        return deleteDuplicateFiles == null ? getDefault(config.getMovers(), "isDeleteDuplicateFiles", boolean.class) : deleteDuplicateFiles;
     }
 
     public long getMinimumFreeSpaceForDownload() {
@@ -132,11 +142,13 @@ public class Config {
     }
 
     public boolean runServer() {
-        return config.getWebServer().isWebServer();
+        final Boolean webServer = config.getWebServer().isWebServer();
+        return webServer == null ? getDefault(config.getWebServer(), "isWebServer", boolean.class) : webServer;
     }
 
     public int getPort() {
-        return config.getWebServer().getPort();
+        final Integer port = config.getWebServer().getPort();
+        return port == null ? getDefault(config.getWebServer(), "getPort", int.class) : port;
     }
 
     private long getMultiplier(final String freeSpace) {
@@ -156,5 +168,38 @@ public class Config {
             default:
                 return 1;
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T getDefault(final Object obj, final String methodName, final Class<T> returnType) {
+        try {
+            final String fieldName = findFieldName(methodName);
+            final Field declaredField = obj.getClass().getDeclaredField(fieldName);
+            final XmlElement declaredAnnotation = declaredField.getDeclaredAnnotation(XmlElement.class);
+            if (declaredAnnotation != null) {
+                final String val = declaredAnnotation.defaultValue();
+                if (returnType == boolean.class) {
+                    return (T) Boolean.valueOf(val);
+                } else if (returnType == int.class) {
+                    return (T) Integer.valueOf(val);
+                } else {
+                    return (T) val;
+                }
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // visible for testing
+    String findFieldName(final String methodName) {
+        int i = 0;
+        while (!Character.isUpperCase(methodName.charAt(i))) {
+            i++;
+        }
+        final String substring = methodName.substring(i);
+        return substring.substring(0, 1).toLowerCase() + substring.substring(1);
     }
 }

@@ -8,10 +8,15 @@ import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.MoveOperators.MoveO
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.MoveOperators.MoveOperator.AdditionalArguments;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.xml.sax.SAXException;
 
+import javax.xml.XMLConstants;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.validation.SchemaFactory;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -37,7 +42,7 @@ public class ConfigLoader {
             }
             for (final Mover m : mover.getMovers().getMover()) {
                 if ((m.getMoveOperator() != null || m.getAdditionalArguments() != null)
-                        && (m.getMoveOperators() != null && m.getMoveOperators().getMoveOperator() != null &&
+                        && (m.getMoveOperators() != null && m.getMoveOperators() != null &&
                         !m.getMoveOperators().getMoveOperator().isEmpty())) {
                     throw new IllegalArgumentException("Cannot have both a basic move operator and the extended list");
                 }
@@ -80,7 +85,7 @@ public class ConfigLoader {
                 updateMover(mover, loadBase());
             }
             return mover;
-        } catch (JAXBException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -158,19 +163,26 @@ public class ConfigLoader {
         }
     }
 
-    private RsyncMover loadBase() throws JAXBException {
+    private RsyncMover loadBase() throws JAXBException, MalformedURLException, SAXException {
         logger.info("Loading default config from resources");
         final Unmarshaller unmarshaller = getUnmarshaller();
         return (RsyncMover) unmarshaller.unmarshal(ConfigLoader.class.getResourceAsStream(defaultConfigPath));
     }
 
-    private RsyncMover load0(final Path path) throws JAXBException {
+    private RsyncMover load0(final Path path) throws JAXBException, MalformedURLException, SAXException {
         logger.info("Loading provided config file");
+        try {
+            final Unmarshaller unmarshaller = getUnmarshaller();
+            unmarshaller.setSchema(SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI).newSchema(getClass().getResource("/beans.xsd")));
+            unmarshaller.unmarshal(path.toFile());
+        } catch (Exception e) {
+            logger.error("Config validation failed", e);
+        }
         final Unmarshaller unmarshaller = getUnmarshaller();
         return (RsyncMover) unmarshaller.unmarshal(path.toFile());
     }
 
-    private Unmarshaller getUnmarshaller() throws JAXBException {
+    private Unmarshaller getUnmarshaller() throws JAXBException, MalformedURLException, SAXException {
         final JAXBContext context = JAXBContext.newInstance(RsyncMover.class);
         return context.createUnmarshaller();
     }

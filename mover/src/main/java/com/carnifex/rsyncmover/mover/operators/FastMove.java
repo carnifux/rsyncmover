@@ -20,7 +20,7 @@ public class FastMove extends MoveOperator {
 
     public FastMove(Audit audit, List<String> additionalArguments) {
         super(audit, additionalArguments);
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+        if (isWindows) {
             throw new IllegalArgumentException("Cannot use " + getMethod() + " operator on windows");
         }
     }

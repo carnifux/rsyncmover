@@ -41,6 +41,7 @@ public class RsyncMover {
     public static synchronized void init(final Config config) {
         final Audit audit = new Audit(config.shouldPassivateAudit(), config.getAuditPassivateLocation(), (Audit) components.get(Audit.class));
         components.put(Audit.class, audit);
+        // don't add to threads in components, as audit doesn't get shut down
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
@@ -90,7 +91,8 @@ public class RsyncMover {
 
     private static List<Sftp> initSshs(final Config config) {
         return config.getServers().stream()
-            .flatMap(server -> server.getDirectories().getDirectory().stream()
+            .flatMap(server -> server.getDirectories().stream()
+                    .map(dir -> dir.getDirectory())
                     .map(dir -> new Sftp(server.getHost(), server.getPort(),
                             dir.getDirectory(), dir.getRealDirectory(), server.getUser(), server.getPass(),
                             server.getHostKey(), config.getFilePermissions())))
@@ -132,24 +134,29 @@ public class RsyncMover {
         if (components.size() != 2) {
             throw new RuntimeException("Did not remove all components - shutdown not successful.");
         }
+        ((Set<Thread>) components.computeIfAbsent(Thread.class, ignore -> new HashSet<>()))
+                .forEach(thread -> Runtime.getRuntime().removeShutdownHook(thread));
+        components.remove(Thread.class);
     }
 
     private static MoverThread initMoverThread(final Config config, final Audit audit) {
         return new MoverThread(config.getFilePermissions(), config.getDeleteDuplicateFiles(), audit);
     }
 
+    @SuppressWarnings("unchecked")
     private static List<FileWatcher> initFileWatchers(final Config config, final MoverThread moverThread, final FileChangeWatcher fileChangeWatcher, final Audit audit) {
         final List<FileWatcher> watchers = config.getWatchDir().stream().map(watch -> new FileWatcher(watch,
                 asSet(config.getPassivateLocation(), config.getAuditPassivateLocation()),
                 fileChangeWatcher, config.isLazyPolling(), audit)).collect(Collectors.toList());
-        Runtime.getRuntime().addShutdownHook(new Thread() {
+        final Thread hook = new Thread() {
             @Override
             public void run() {
                 // finish any pending moves before shutting down vm
                 watchers.forEach(FileWatcher::shutdown);
                 moverThread.shutdown();
             }
-        });
+        };
+        ((Set<Thread>) components.computeIfAbsent(Thread.class, ignore -> new HashSet<>())).add(hook);
         return watchers;
     }
 
@@ -159,13 +166,15 @@ public class RsyncMover {
         final Syncer syncer = new Syncer(config.getWatchDir(), sftps, syncedFiles, config.getSyncFrequency(),
                 config.shouldDepassivateEachTime(), config.getMinimumFreeSpaceForDownload(), config.getFilePermissions(),
                 config.downloadsMustMatchMover(), movers, config.isLazyPolling(), (List<FileWatcher>) components.get(FileWatcher.class), audit);
-        Runtime.getRuntime().addShutdownHook(new Thread() {
+        final Thread hook = new Thread() {
             @Override
             public void run() {
                 // finish any pending downloads before shutting down vm
                 syncer.shutdown();
             }
-        });
+        };
+        Runtime.getRuntime().addShutdownHook(hook);
+        ((Set<Thread>) components.computeIfAbsent(Thread.class, ignore -> new HashSet<>())).add(hook);
         return syncer;
     }
 

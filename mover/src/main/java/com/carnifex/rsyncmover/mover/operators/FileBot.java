@@ -33,20 +33,17 @@ public class FileBot extends MoveOperator {
     private final Pattern formatDetectionRegex = Pattern.compile("--format");
     private final Pattern formatModificationRegex = Pattern.compile("(\"*)(.*)");
     private final Pattern pathFindingRegex;
-    private final boolean isWindows;
     private final Move move;
 
     private FileBot() {
         this.additionalArguments = null;
         this.pathFindingRegex = null;
-        this.isWindows = false;
         this.move = null;
     }
 
     private FileBot(final Audit audit, final List<String> additionalArguments) {
         super(audit, additionalArguments);
         this.additionalArguments = new ArrayList<>(additionalArguments != null ? additionalArguments : Collections.emptyList());
-        this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         this.pathFindingRegex = Pattern.compile("(.*)\\" + File.separator + "(.*)\\" + File.separator +
                 "..\\" + File.separator + "(.*)\\" + File.separator + "(.*\\..*)");
         final Iterator<String> iter = this.additionalArguments.iterator();

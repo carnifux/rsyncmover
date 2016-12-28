@@ -46,6 +46,16 @@ public class Syncer extends Thread {
                   final boolean downloadsMustMatchMover, final List<Mover> movers, final boolean lazyPolling, final List<FileWatcher> fileWatchers, final Audit audit) {
         super("Syncer");
         this.dlDirs = dlDirs;
+        dlDirs.forEach(dir -> {
+            try {
+                final Path path = Paths.get(dir);
+                if (!Files.exists(path)) {
+                    Files.createDirectories(path);
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
         this.syncedFiles = syncedFiles;
         this.sftps = sftps;
         this.sftps.forEach(ssh -> audit.addDownloadWatcher(ssh.getDownloadWatcher()));
@@ -113,7 +123,7 @@ public class Syncer extends Thread {
                 audit.add(new ErrorEntry(msg, e));
             }
         }
-        logger.debug("Finished downloading new files");
+        logger.info("Finished downloading new files");
         if (passivateEachTime) {
             syncedFiles.finished();
         }
@@ -172,18 +182,17 @@ public class Syncer extends Thread {
             logger.info("Waiting for downloads to finish before shutting down thread");
             while (!sleeping) {
                 try {
-                    Thread.sleep(100);
+                    Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     logger.error("Syncer shutdown interrupted whilst waiting for download to finish", e);
+                    break;
                 }
             }
             logger.info("Downloads finished, shutting down thread");
         }
         syncedFiles.finished();
         this.running = false;
-        if (sleeping) {
-            this.interrupt();
-        }
+        this.interrupt();
     }
 
 }

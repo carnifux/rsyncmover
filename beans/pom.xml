@@ -45,7 +45,7 @@
                 <configuration>
                     <!-- The schema directory or xsd files. -->
                     <sources>
-                        <source>src/main/xsd/beans.xsd</source>
+                        <source>src/main/resources/beans.xsd</source>
                     </sources>
                     <!-- The package in which the source files will be generated. -->
                     <packageName>com.carnifex.rsyncmover.beans</packageName>

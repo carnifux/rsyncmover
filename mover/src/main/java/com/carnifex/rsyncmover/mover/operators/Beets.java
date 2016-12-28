@@ -21,17 +21,15 @@ import java.util.stream.Stream;
 
 public class Beets extends MoveOperator {
 
-    static final String tempPath = File.separator + "beetstemp";
+    private static final String tempPath = File.separator + "beetstemp";
     private final Move move;
     private final List<String> additionalArguments;
     private String beetsLocation = "beet";
     private String untaggedLocation;
-    private final boolean isWindows;
 
     private Beets() {
         this.move = null;
         this.additionalArguments = null;
-        this.isWindows = false;
     }
 
     private Beets(final Audit audit, final List<String> additionalArguments) {
@@ -49,7 +47,6 @@ public class Beets extends MoveOperator {
                 iter.remove();
             }
         }
-        this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         this.move = (Move) MoveOperator.create("move", Collections.emptyList(), audit);
 
         try {

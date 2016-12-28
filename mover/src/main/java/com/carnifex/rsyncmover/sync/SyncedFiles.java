@@ -25,7 +25,7 @@ public class SyncedFiles {
     private volatile Map<String, Set<String>> synced;
     private final Path persistLocation;
     private volatile boolean passive;
-    private final boolean active;
+    private final boolean enabled;
 
     public SyncedFiles(final Path persistLocation) {
         this.synced = new ConcurrentHashMap<>();
@@ -38,27 +38,28 @@ public class SyncedFiles {
                     create = file.createNewFile();
                 } catch (IOException ignore) {}
                 if (!create) {
-                    logger.error("Could not create persist file " + persistLocation.toString() + ", will not function");
-                    this.active = false;
+                    logger.error("Could not create persist file " + persistLocation.toString()
+                            + ", synced files will not function (duplicates will be downloaded)");
+                    this.enabled = false;
                     this.passive = false;
                 } else {
-                    this.active = true;
+                    this.enabled = true;
                     this.passive = true;
                 }
             } else {
-                this.active = true;
+                this.enabled = true;
                 this.passive = true;
             }
         } else {
-            logger.error("Could not create persist file, will not function");
-            this.active = false;
+            logger.error("Could not create persist file, synced files will not function (duplicates will be downloaded)");
+            this.enabled = false;
             this.passive = false;
         }
 
     }
 
     public boolean shouldDownload(final String serverName, final String path) {
-        if (!active) {
+        if (!enabled) {
             return true;
         }
         depersist();
@@ -66,7 +67,7 @@ public class SyncedFiles {
     }
 
     public void addDownloadedPath(final String serverName, final String path) {
-        if (!active) {
+        if (!enabled) {
             return;
         }
         depersist();
@@ -78,7 +79,7 @@ public class SyncedFiles {
     }
 
     private void persist() {
-        if (!passive && active) {
+        if (!passive && enabled) {
             synchronized (this) {
                 if (!passive) {
                     if (logger.isDebugEnabled()) {
@@ -99,14 +100,14 @@ public class SyncedFiles {
     }
 
     private void depersist() {
-        if (passive && active) {
+        if (passive && enabled) {
             synchronized (this) {
                 if (passive) {
                     try {
                         final Map<String, Set<String>> newSynced = new ConcurrentHashMap<>();
                         final List<String> entries = Files.readAllLines(persistLocation);
                         logger.debug("Depersisted " + entries.size() + " entries");
-                        entries.stream().forEach(string -> {
+                        entries.forEach(string -> {
                             final String[] split = string.split(SERVER_SEPARATOR);
                             newSynced.computeIfAbsent(split[0], ignore -> new HashSet<>()).add(split[1]);
                         });

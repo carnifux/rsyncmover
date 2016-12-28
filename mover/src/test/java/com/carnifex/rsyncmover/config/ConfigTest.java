@@ -27,6 +27,12 @@ public class ConfigTest {
         assertEquals((long) (1.5 * 1024L), createFreeSpaceConfig("1.5k").getMinimumFreeSpaceForDownload());
     }
 
+    @Test
+    public void testFieldName() {
+        assertEquals("test", createFreeSpaceConfig("").findFieldName("isTest"));
+        assertEquals("test", createFreeSpaceConfig("").findFieldName("getTest"));
+    }
+
 
     private Config createFreeSpaceConfig(final String s) {
         final RsyncMover rsyncMover = new RsyncMover();

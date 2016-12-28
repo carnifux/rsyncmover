@@ -34,6 +34,7 @@ public abstract class MoveOperator {
     private static final String PACKAGE_NAME = "com.carnifex.rsyncmover.mover.operators";
     public static final String DEFAULT_OPERATOR = "move";
     protected final Audit audit;
+    protected final boolean isWindows;
 
     protected abstract Path operate(final Path from, final Path to) throws IOException;
     public abstract String getMethod();
@@ -41,10 +42,12 @@ public abstract class MoveOperator {
 
     protected MoveOperator() {
         this.audit = null;
+        this.isWindows = false;
     }
 
     protected MoveOperator(final Audit audit, final List<String> additionalArguments) {
         this.audit = audit;
+        this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
     }
 
     public Path move(final Path from, final Path to, final Set<PosixFilePermission> filePermissions) throws IOException {

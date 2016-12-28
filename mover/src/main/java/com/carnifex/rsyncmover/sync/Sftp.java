@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -34,7 +34,7 @@ public class Sftp {
     private final String hostKey;
     private final Set<PosixFilePermission> filePermissions;
     private final DownloadWatcher watcher;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService executor;
 
     public Sftp(final String server, final int port, final String remoteDirectory, final String remoteRealDirectory,
                 final String user, final String pass, final String hostKey,
@@ -48,6 +48,7 @@ public class Sftp {
         this.hostKey = hostKey;
         this.filePermissions = filePermissions;
         this.watcher = new DownloadWatcher();
+        this.executor =  Executors.newSingleThreadExecutor(r -> new Thread("SftpDownloadThread-" + server));
         logger.info("Sftp client for server " + server + ":" + port + ", monitoring " + remoteDirectory + " successfully initialized");
     }
 
@@ -82,28 +83,32 @@ public class Sftp {
 
         try (final SshClient sshClient = new SshClient();
              final SFTPClient sftp = sshClient.getSftp()) {
-            for (final String file : files) {
+            logger.info("Downloading " + files.size() + " files");
+            for (int i = 0; i < files.size(); i++) {
+                final String file = files.get(i);
                 final String source = remoteDirectory + file;
                 executor.submit(() -> {
+                    try {
+                        logger.info("Starting download of " + source + " (" + formatSize(getSize(sftp, source)) + ")");
+                        sftp.get(source, target);
+                    } catch (Exception e) {
+                        if (remoteRealDirectory != null) {
                             try {
-                                sftp.get(source, target);
-                            } catch (Exception e) {
-                                if (remoteRealDirectory != null) {
-                                    logger.warn(server + ": Failed downloading file " + file + ", trying symlink dir");
-                                    try {
-                                        final String withoutSymlink = removeSymlink(source);
-                                        sftp.get(withoutSymlink, target);
-                                    } catch (Exception e1) {
-                                        logger.error(server + ": Failed downloading file " + file + " completely");
-                                        throw e1;
-                                    }
-                                }
-                                logger.error(server + ": Failed downloading file " + file);
-                                throw e;
+                                logger.warn(server + ": Failed downloading file " + file + ", trying symlink dir");
+                                final String withoutSymlink = removeSymlink(source);
+                                sftp.get(withoutSymlink, target);
+                            } catch (Exception e1) {
+                                logger.error(server + ": Failed downloading file " + file + " completely");
+                                throw e1;
                             }
-                            return null;
-                        }).get();
+                        }
+                        logger.error(server + ": Failed downloading file " + file);
+                        throw e;
+                    }
+                    return null;
+                }).get();
                 callback.accept(file);
+                logger.info("Finished downloading " + source + "; " + (files.size() - i) + " remaining");
                 watcher.finished();
                 if (filePermissions != null) {
                     Files.setPosixFilePermissions(Paths.get(target), filePermissions);
@@ -111,6 +116,32 @@ public class Sftp {
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private long getSize(final SFTPClient sftp, final String source) throws IOException {
+        final long size = sftp.size(source);
+        if (size == 4096) { // is a folder on a linux server
+            final List<RemoteResourceInfo> ls = sftp.ls(source);
+            return ls.stream().map(rri -> rri.getPath()).map(path -> {
+                try {
+                    return getSize(sftp, path);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }).reduce(0L, (a, b) -> a + b);
+        }
+        return size;
+    }
+
+    // visible for testing
+    String formatSize(final long size) {
+        if (size >= 1_000_000_000) {
+            return (size / 1_000_000_000) + "GB";
+        } else if (size >= 1_000_000) {
+            return (size / 1_000_000) + "MB";
+        } else {
+            return size + "B";
         }
     }
 
