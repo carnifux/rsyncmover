@@ -34,11 +34,13 @@ public class FileBot extends MoveOperator {
     private final Pattern formatModificationRegex = Pattern.compile("(\"*)(.*)");
     private final Pattern pathFindingRegex;
     private final boolean isWindows;
+    private final Move move;
 
     private FileBot() {
         this.additionalArguments = null;
         this.pathFindingRegex = null;
         this.isWindows = false;
+        this.move = null;
     }
 
     private FileBot(final Audit audit, final List<String> additionalArguments) {
@@ -81,6 +83,7 @@ public class FileBot extends MoveOperator {
                 throw new IllegalArgumentException("Filebot format arguments \"" + containsFormat.stream().collect(Collectors.joining(", ")) + " invalid - only one format option allowed");
             }
         }
+        this.move = (Move) MoveOperator.create("move", additionalArguments, audit);
     }
 
     @Override
@@ -123,12 +126,26 @@ public class FileBot extends MoveOperator {
         }
 
         if (isDirectory) {
+            // any remaining files, put them in the new location
+            if (newPath.isPresent() && Files.list(to).count() > 0) {
+                Files.list(to).forEach(path -> {
+                    try {
+                        move.operate(path, newPath.get());
+                    } catch (IOException e) {
+                        final String msg = "Exception moving extra files in filebot operation";
+                        audit.add(new ErrorEntry(msg, e));
+                        logger.error(msg, e);
+                    }
+                });
+            }
             // delete the now empty folder
             if (Files.list(to).count() == 0) {
                 logger.info("Filebot mover deleting now empty directory " + to.toString());
                 Files.deleteIfExists(to);
             } else {
-                logger.warn("Directory not empty after filebot move, not deleting: " + to.toString());
+                final String msg = "Directory not empty after filebot move, not deleting: " + to.toString();
+                audit.add(new ErrorEntry(msg));
+                logger.warn(msg);
             }
         }
         exec.destroy();

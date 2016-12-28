@@ -3,11 +3,9 @@ package com.carnifex.rsyncmover.config;
 
 import com.carnifex.rsyncmover.beans.RsyncMover;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover;
-import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.AdditionalArguments;
-import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.DontMatchMoverByName;
-import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.DontMatchPatterns;
-import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.Extensions;
-import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.Patterns;
+import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.*;
+import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.MoveOperators.MoveOperator;
+import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover.MoveOperators.MoveOperator.AdditionalArguments;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -37,10 +35,34 @@ public class ConfigLoader {
             if (mover.getMovers() == null) {
                 mover.setMovers(new RsyncMover.Movers());
             }
-            for (Mover m : mover.getMovers().getMover()) {
-                if (m.getAdditionalArguments() == null) {
-                    m.setAdditionalArguments(new AdditionalArguments());
+            for (final Mover m : mover.getMovers().getMover()) {
+                if ((m.getMoveOperator() != null || m.getAdditionalArguments() != null)
+                        && (m.getMoveOperators() != null && m.getMoveOperators().getMoveOperator() != null &&
+                        !m.getMoveOperators().getMoveOperator().isEmpty())) {
+                    throw new IllegalArgumentException("Cannot have both a basic move operator and the extended list");
                 }
+                if (m.getMoveOperator() == null && m.getMoveOperators() == null) {
+                    m.setMoveOperator(com.carnifex.rsyncmover.mover.operators.MoveOperator.DEFAULT_OPERATOR);
+                }
+                if (m.getMoveOperator() != null) {
+                    final MoveOperators moveOperators = new MoveOperators();
+                    final String[] split = m.getMoveOperator().split("\\+");
+                    for (final String s : split) {
+                        final MoveOperator op = new MoveOperator();
+                        op.setOperator(s);
+                        op.setAdditionalArguments(new AdditionalArguments());
+                        if (m.getAdditionalArguments() != null) {
+                            op.getAdditionalArguments().getArg().addAll(m.getAdditionalArguments().getArg());
+                        }
+                        moveOperators.getMoveOperator().add(op);
+                    }
+                    m.setMoveOperators(moveOperators);
+                }
+                m.getMoveOperators().getMoveOperator().forEach(op -> {
+                    if (op.getAdditionalArguments() == null) {
+                        op.setAdditionalArguments(new AdditionalArguments());
+                    }
+                });
             }
             if (mover.getServers() == null) {
                 mover.setServers(new RsyncMover.Servers());

@@ -58,6 +58,10 @@ public class MoverThread extends Thread {
                         logger.info("Finished moving files");
                     }
                 }
+                if (this.shutdown) {
+                    logger.info("Shutting down MoverThread with " + pathObjectQueue.size() + " items left to be moved");
+                    return;
+                }
             } catch (InterruptedException e) {
                 logger.debug("MoverThread interrupted", e);
                 return;
@@ -86,6 +90,8 @@ public class MoverThread extends Thread {
     public void submit(final Path from, final Path to, final MoveOperator operator) {
         if (!shutdown) {
             pathObjectQueue.add(new PathObject(from, to, operator));
+            logger.info(from.getFileName().toString() + " added to move queue with operator " + operator.getMethod()
+                    + "; queue now contains " + pathObjectQueue.size() + " items");
         }
     }
 
@@ -100,13 +106,15 @@ public class MoverThread extends Thread {
                 }
                 audit.add(new DuplicateEntry(pathObject.getTo().toString()));
             }
+            logger.info("Moving " + pathObject.getFrom() + " to " + pathObject.getTo() + " with operator " + pathObject.getOperator().getMethod());
             final Path finalDir = pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions);
+            logger.info("Move of " + pathObject.getFrom() + " finished; ended up at " + finalDir + ". " + pathObjectQueue.size() + " items remaining");
             audit.add(new MovedEntry(pathObject.getFrom().toString(), finalDir.toString(), pathObject.getOperator().getMethod()));
             if (filePermissions != null && pathObject.getOperator().shouldSetFilePermissions()) {
                 Permissions.setPermissions(finalDir, filePermissions);
             }
         } catch (Exception e) {
-            final String s = "Error moving from " + pathObject.getFrom().toString() + " to " + pathObject.getTo().toString();
+            final String s = pathObject.getOperator().getMethod() + ": Error moving from " + pathObject.getFrom().toString() + " to " + pathObject.getTo().toString();
             logger.error(s, e);
             audit.add(new ErrorEntry(s, e));
         }

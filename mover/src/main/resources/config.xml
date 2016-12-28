@@ -17,6 +17,7 @@
             <patterns>
                 <pattern>\d+[Xx]\d+</pattern>
                 <pattern>[Ss]\d+[Ee]\d+</pattern>
+                <pattern>\d+\.\d+</pattern>
             </patterns>
             <extensions>
                 <extension>mkv</extension>

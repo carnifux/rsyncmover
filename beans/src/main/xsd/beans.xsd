@@ -58,6 +58,7 @@
                                         reduced average memory footprint but more disk activity</xs:documentation>
                                 </xs:annotation>
                             </xs:element>
+                            <xs:element type="xs:boolean" name="writeLogFile" default="true"></xs:element>
                             <xs:element name="mover" maxOccurs="unbounded" minOccurs="0">
                                 <xs:annotation>
                                     <xs:documentation>each mover defines a folder to move to and the rules under which those can be matched</xs:documentation>
@@ -143,7 +144,27 @@
                                                     and ALL files need to match one of the specified extensions (if specified)</xs:documentation>
                                             </xs:annotation>
                                         </xs:element>
-                                        <xs:element type="xs:string" name="moveOperation" minOccurs="0"></xs:element>
+                                        <xs:element name="moveOperators">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element name="moveOperator" maxOccurs="unbounded" minOccurs="0">
+                                                        <xs:complexType>
+                                                            <xs:sequence>
+                                                                <xs:element type="xs:string" name="operator"/>
+                                                                <xs:element name="additionalArguments" minOccurs="0">
+                                                                    <xs:complexType>
+                                                                        <xs:sequence>
+                                                                            <xs:element type="xs:string" name="arg" maxOccurs="unbounded" minOccurs="0"/>
+                                                                        </xs:sequence>
+                                                                    </xs:complexType>
+                                                                </xs:element>
+                                                            </xs:sequence>
+                                                        </xs:complexType>
+                                                    </xs:element>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
+                                        <xs:element name="moveOperator" type="xs:string" minOccurs="0"/>
                                         <xs:element name="additionalArguments" minOccurs="0">
                                             <xs:complexType>
                                                 <xs:sequence>
@@ -176,6 +197,7 @@
                             </xs:element>
                             <xs:element type="xs:string" name="minimumFreeSpaceToDownload" default="0"></xs:element>
                             <xs:element type="xs:boolean" name="mustMatchMoverForDownload" default="false"/>
+                            <xs:element type="xs:boolean" name="killDownloadOnExit" default="false"/>
                             <xs:element type="xs:boolean" name="removePassivatedFilesIfNoLongerExistOnServer" default="true">
                                 <xs:annotation>
                                     <xs:documentation>if the file doesn't exist on the server, remove it from the passivate file</xs:documentation>

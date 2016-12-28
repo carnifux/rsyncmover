@@ -13,6 +13,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -34,14 +35,23 @@ public class Config {
         if (config.getLogLevel() != null) {
             try {
                 final LoggerContext context = (LoggerContext) LogManager.getContext(false);
-                final LoggerConfig loggerConfig = context.getConfiguration().getLoggerConfig(LogManager.ROOT_LOGGER_NAME);
-                loggerConfig.setLevel(Level.getLevel(config.getLogLevel().toUpperCase()));
+                final Collection<LoggerConfig> loggers = context.getConfiguration().getLoggers().values();
+                final Level level = Level.getLevel(config.getLogLevel().toUpperCase());
+                loggers.forEach(logger -> logger.setLevel(level));
                 context.updateLoggers();
                 logger.info("Set log level to " + config.getLogLevel());
             } catch (Exception e) {
                 logger.error("Exception setting log level", e);
             }
         }
+    }
+
+    public boolean shouldWriteLogFile() {
+        return config.getMovers().isWriteLogFile();
+    }
+
+    public boolean killDownloadOnExit() {
+        return config.getServers().isKillDownloadOnExit();
     }
 
     public String getMoverPassivateLocation() {

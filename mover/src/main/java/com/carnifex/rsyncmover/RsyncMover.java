@@ -27,6 +27,7 @@ public class RsyncMover {
 
     private static final Logger logger = LogManager.getLogger();
     private static final Map<Class<?>, Object> components = new ConcurrentHashMap<>();
+    private static Config currentConfig;
 
 
     public static void main(String[] args) {
@@ -38,7 +39,6 @@ public class RsyncMover {
     }
 
     public static synchronized void init(final Config config) {
-
         final Audit audit = new Audit(config.shouldPassivateAudit(), config.getAuditPassivateLocation(), (Audit) components.get(Audit.class));
         components.put(Audit.class, audit);
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -85,6 +85,7 @@ public class RsyncMover {
             final Server server = new Server(config.getPort(), (Syncer) components.get(Syncer.class), movers, audit);
             components.putIfAbsent(Server.class, server);
         }
+        currentConfig = config;
     }
 
     private static List<Sftp> initSshs(final Config config) {
@@ -98,12 +99,12 @@ public class RsyncMover {
 
 
     public static synchronized void reinit(final String configPath) {
-        shutdownAll();
+        shutdownAll(currentConfig);
         init(new Config(new ConfigLoader().load(configPath)));
     }
 
     @SuppressWarnings("unchecked")
-    private static void shutdownAll() {
+    private static void shutdownAll(final Config config) {
         final List<Emailer> emailer = (List<Emailer>) components.remove(Emailer.class);
         emailer.forEach(Thread::interrupt);
         // shut down movers first so any current downloads arent moved with old movers
@@ -117,6 +118,9 @@ public class RsyncMover {
         }
         if (components.containsKey(Syncer.class)) {
             final List<Sftp> sftps = (List<Sftp>) components.remove(Sftp.class);
+            if (config.killDownloadOnExit()) {
+                sftps.forEach(Sftp::forceShutdown);
+            }
             final Syncer syncer = (Syncer) components.remove(Syncer.class);
             syncer.shutdown();
         }

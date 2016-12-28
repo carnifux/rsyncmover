@@ -187,9 +187,11 @@ public class FileChangeWatcher extends Thread {
             final long thisPoll = System.currentTimeMillis();
             if (thisSize == this.lastSize && thisModified == this.lastModified) {
                 final boolean overTime = thisPoll > lastPolled + MIN_INTERVAL;
-                logger.trace("File not changed, " + (overTime ? "time passed, trying to open" : "waiting for time"));
+                logger.trace(file.getName() + " not changed, " + (overTime ? "time passed, trying to open" : "waiting for time"));
                 // try to open the file with write privileges just to be sure
                 return overTime && (file.isDirectory() ? tryOpenDirectory(file) : tryOpen(file));
+            } else {
+                logger.trace(file.getName() + " changed since last check");
             }
             this.lastSize = thisSize;
             this.lastModified = thisModified;
@@ -206,7 +208,7 @@ public class FileChangeWatcher extends Thread {
             RandomAccessFile tryFile = null;
             try {
                 tryFile = new RandomAccessFile(f, "rw");
-                logger.trace("File able to be opened, moving");
+                logger.trace(f.getName() + " able to be opened");
                 return true;
             } catch (IOException e) {
                 logger.debug(e);

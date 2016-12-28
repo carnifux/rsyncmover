@@ -46,6 +46,7 @@ public class AuditTest {
     }
 
     @Test
+    @Ignore
     public void upTime_long() throws Exception {
         final Audit audit = new Audit(false, null, null);
         final String uptime = audit.makeUptime(LocalDateTime.now().minusMinutes(57).minusHours(17).minusDays(14).minusMonths(4).minusYears(1));

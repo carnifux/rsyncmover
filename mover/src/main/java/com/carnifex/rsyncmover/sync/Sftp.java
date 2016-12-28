@@ -15,6 +15,9 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -31,6 +34,7 @@ public class Sftp {
     private final String hostKey;
     private final Set<PosixFilePermission> filePermissions;
     private final DownloadWatcher watcher;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     public Sftp(final String server, final int port, final String remoteDirectory, final String remoteRealDirectory,
                 final String user, final String pass, final String hostKey,
@@ -80,22 +84,25 @@ public class Sftp {
              final SFTPClient sftp = sshClient.getSftp()) {
             for (final String file : files) {
                 final String source = remoteDirectory + file;
-                try {
-                    sftp.get(source, target);
-                } catch (Exception e) {
-                    if (remoteRealDirectory != null) {
-                        logger.warn("Failed downloading file " + file + ", trying symlink dir");
-                        try {
-                            final String withoutSymlink = removeSymlink(source);
-                            sftp.get(withoutSymlink, target);
-                        } catch (Exception e1) {
-                            logger.error("Failed downloading file " + file + " completely");
-                            throw e1;
-                        }
-                    }
-                    logger.error("Failed downloading file " + file);
-                    throw e;
-                }
+                executor.submit(() -> {
+                            try {
+                                sftp.get(source, target);
+                            } catch (Exception e) {
+                                if (remoteRealDirectory != null) {
+                                    logger.warn(server + ": Failed downloading file " + file + ", trying symlink dir");
+                                    try {
+                                        final String withoutSymlink = removeSymlink(source);
+                                        sftp.get(withoutSymlink, target);
+                                    } catch (Exception e1) {
+                                        logger.error(server + ": Failed downloading file " + file + " completely");
+                                        throw e1;
+                                    }
+                                }
+                                logger.error(server + ": Failed downloading file " + file);
+                                throw e;
+                            }
+                            return null;
+                        }).get();
                 callback.accept(file);
                 watcher.finished();
                 if (filePermissions != null) {
@@ -107,6 +114,12 @@ public class Sftp {
         }
     }
 
+    public void forceShutdown() {
+        final List<Runnable> runnables = executor.shutdownNow();
+        if (!runnables.isEmpty()) {
+            logger.warn("Interrupted " + runnables.size() + " download tasks");
+        }
+    }
 
     private final class SshClient implements AutoCloseable {
         private final SSHClient ssh;
@@ -147,7 +160,7 @@ public class Sftp {
                 });
                 return client;
             } catch (IOException e) {
-                logger.error("Error creating new SFTP client", e);
+                logger.error(server + ": Error creating new SFTP client", e);
                 throw new RuntimeException(e);
             }
         }
@@ -165,30 +178,39 @@ public class Sftp {
 
         private String name;
         private long size;
+        private long started;
         private long transferred;
         private float percent;
         private boolean currentlyActive = false;
+        private long speed;
 
-        public void reset(final String name, final long size) {
+        void reset(final String name, final long size) {
             this.name = name;
             this.size = size;
+            this.started = System.currentTimeMillis();
             this.transferred = 0;
             this.percent = 0f;
             this.currentlyActive = true;
+            this.speed = 0;
         }
 
-        public void update(final long transferred) {
+        void update(final long transferred) {
+            final long time = (System.currentTimeMillis() - started) / 1000;
+            if (time > 0) {
+                this.speed = transferred / time;
+            }
             this.transferred = transferred;
             this.percent = 100 * ((float) this.transferred / (float) size);
         }
 
         public String getMessage() {
-            return "Downloading " + name + ": " + formatBytes(transferred) + "/" + formatBytes(size) + " - " + percent + "%";
+            return "Downloading " + name + ": " + formatBytes(transferred) + "/" + formatBytes(size) + " - " + percent + "% ("
+                    + formatBytes(speed) + "/s)";
         }
 
-        public String formatBytes(final long bytes) {
+        private String formatBytes(final long bytes) {
             if (bytes > 1000000) { // if > 1mb
-                return round(((float) bytes / (float) 1000000), 2) + "MiB";
+                return String.valueOf(round(((float) bytes / (float) 1_000_000), 2)) + "MiB";
             }
             return bytes + "B";
         }
@@ -201,7 +223,7 @@ public class Sftp {
             return (float) (int) ((tmp - (int) tmp) >= 0.5f ? tmp + 1 : tmp) / pow;
         }
 
-        public void finished() {
+        private void finished() {
             this.currentlyActive = false;
         }
 

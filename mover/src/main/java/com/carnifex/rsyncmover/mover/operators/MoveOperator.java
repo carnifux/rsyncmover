@@ -2,6 +2,7 @@ package com.carnifex.rsyncmover.mover.operators;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.beans.RsyncMover;
 import com.carnifex.rsyncmover.mover.Permissions;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -21,12 +22,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.LocalDateTime;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -36,6 +32,7 @@ public abstract class MoveOperator {
     private static final Map<String, Class<? extends MoveOperator>> operators = new HashMap<>();
     private static final Map<String, MoveOperator> instantiatedOperators = new HashMap<>();
     private static final String PACKAGE_NAME = "com.carnifex.rsyncmover.mover.operators";
+    public static final String DEFAULT_OPERATOR = "move";
     protected final Audit audit;
 
     protected abstract Path operate(final Path from, final Path to) throws IOException;
@@ -51,13 +48,14 @@ public abstract class MoveOperator {
     }
 
     public Path move(final Path from, final Path to, final Set<PosixFilePermission> filePermissions) throws IOException {
+        final long startTime = System.currentTimeMillis();
         if (from.equals(to)) {
-            final String msg = "Origin and destination are the same, not moving: " + to;
+            final String msg = getMethod() + ": Origin and destination are the same, not moving: " + to;
             logger.info(msg);
             throw new IOException(msg);
         }
         if (to.toFile().exists()) {
-            final String msg = "File already exists, not moving: " + to;
+            final String msg = getMethod() + ": File already exists, not moving: " + to;
             logger.error(msg);
             throw new IOException(msg);
         }
@@ -65,27 +63,36 @@ public abstract class MoveOperator {
         final Path parent = to.getParent();
         final boolean mkdirs = parent.toFile().mkdirs();
         if (mkdirs) {
-            logger.debug("Created directories for move " + parent.toString());
+            logger.debug(getMethod() + ": Created directories for move " + parent.toString());
             if (filePermissions != null) {
                 Permissions.setPermissions(parent, filePermissions);
             }
         }
         final Path path = operate(from, to);
-        log(to);
+        log(path);
+        logger.info("Moved " + from + " in " + (System.currentTimeMillis() - startTime) / 1000 + "ms");
         return path;
     }
 
     private void log(final Path path) {
-        logger.info("Finished moving " + path);
+        logger.info(getMethod() + ": Finished moving " + path);
         final String message = LocalDateTime.now().toString() + " " + path.getFileName() + "\n";
         try {
             Files.write(path.getParent().resolve("rsync_mover.log"), message.getBytes(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
         } catch (IOException e) {
-            logger.error("Error writing log for " + path.toString(), e);
+            logger.error(getMethod() + ": Error writing log for " + path.toString(), e);
         }
     }
 
-    public static MoveOperator create(final String value, final List<String> additionalArguments, final Audit audit)  {
+    public static MoveOperator create(final List<RsyncMover.Movers.Mover.MoveOperators.MoveOperator> operators, final Audit audit) {
+        if (operators.size() == 1) {
+            return create(operators.get(0).getOperator(), operators.get(0).getAdditionalArguments().getArg(), audit);
+        }
+        final List<MoveOperator> ops = operators.stream().map(op -> create(op.getOperator(), op.getAdditionalArguments().getArg(), audit)).collect(Collectors.toList());
+        return new CompositeOperator(ops);
+    }
+
+    protected static MoveOperator create(final String value, final List<String> additionalArguments, final Audit audit)  {
         if (operators.isEmpty()) {
             try {
                 init();
@@ -151,4 +158,5 @@ public abstract class MoveOperator {
             appenders.forEach(appender -> context.getRootLogger().addAppender(appender));
         }
     }
+
 }
