@@ -127,7 +127,7 @@ public class FileBot extends MoveOperator {
             if (newPath.isPresent() && Files.list(to).count() > 0) {
                 Files.list(to).forEach(path -> {
                     try {
-                        move.operate(path, newPath.get());
+                        move.operate(path, newPath.get().resolve(path.getFileName()));
                     } catch (IOException e) {
                         final String msg = "Exception moving extra files in filebot operation";
                         audit.add(new ErrorEntry(msg, e));

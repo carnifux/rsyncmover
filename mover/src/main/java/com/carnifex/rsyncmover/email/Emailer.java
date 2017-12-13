@@ -2,6 +2,7 @@ package com.carnifex.rsyncmover.email;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.xbill.DNS.*;
@@ -23,6 +24,7 @@ public class Emailer extends Thread {
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final Logger logger = LogManager.getLogger();
     private static final String emailContentType = "text/html; charset=utf-8";
+    private final boolean enabled;
     private final String to;
     private final String from;
     private final Properties properties;
@@ -31,6 +33,7 @@ public class Emailer extends Thread {
 
     public Emailer(final boolean enabled, final String to, final String from, final LocalTime timeToSendEmail, final Audit audit) {
         super("Emailer");
+        this.enabled = true;
         this.to = to;
         this.from = from;
         this.timeToSendEmail = timeToSendEmail;
@@ -41,7 +44,7 @@ public class Emailer extends Thread {
             this.properties.put("mail.transport.protocol", "smtp");
             final String mxRecord = getMXRecordsForEmailAddress(to);
             logger.debug("Found host address for email " + to + " as " + mxRecord);
-            this.properties.put("mail.smtp.host", mxRecord);
+            this.properties.put("mail.smtp.host", "relay.plus.net");
             this.properties.put("mail.smtp.port", "25");
             this.properties.put("mail.smtp.from", from);
             this.properties.put("mail.smtp.allow8bitmime", "true");
@@ -73,11 +76,14 @@ public class Emailer extends Thread {
         return nextInMinutes == 0 ? Duration.between(now, now.plusDays(1)).getSeconds() * 1000L : next * 1000L;
     }
 
-    private void send() {
+    public void send() {
+        if (!enabled) {
+            return;
+        }
         try {
             final Session session = Session.getInstance(properties);
             final MimeMessage message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(String.format("\"%s\"<%s>", to, from)));
+            message.setFrom(new InternetAddress(String.format("\"%s\"<%s>", from, from)));
             message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
             message.setSubject("RsyncMover Email Summary " + LocalDate.now().format(formatter));
             audit.accessing();
@@ -87,7 +93,9 @@ public class Emailer extends Thread {
             Transport.send(message);
             logger.info("Email successfully sent");
         } catch (MessagingException e) {
-            logger.error("Exception sending email", e);
+            final String msg = "Exception sending email";
+            logger.error(msg, e);
+            audit.add(new ErrorEntry(msg, e));
         }
     }
 

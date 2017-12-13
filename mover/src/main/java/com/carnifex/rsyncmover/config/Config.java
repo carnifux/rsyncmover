@@ -49,6 +49,21 @@ public class Config {
         }
     }
 
+    public long getMaxDownloadSpeedBytes() {
+        final String maxDownloadSpeed = config.getServers().getMaxDownloadSpeed();
+        return Long.parseLong(maxDownloadSpeed == null ? getDefault(config.getServers(), "getMaxDownloadSpeed", String.class) : maxDownloadSpeed);
+    }
+
+    public boolean isRunOnce() {
+        final Boolean runOnce = config.isRunOnce();
+        return runOnce == null ? getDefault(config, "isRunOnce", boolean.class) : runOnce;
+    }
+
+    public int maxConcurrentDownloads() {
+        final Integer maxConcurrentDownloads = config.getServers().getMaxConcurrentDownloads();
+        return maxConcurrentDownloads == null ? getDefault(config.getServers(), "getMaxConcurrentDownloads", int.class) : maxConcurrentDownloads;
+    }
+
     public boolean shouldWriteLogFile() {
         return config.getMovers().isWriteLogFile();
     }
@@ -186,7 +201,7 @@ public class Config {
                     return (T) val;
                 }
             } else {
-                return null;
+                throw new RuntimeException();
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

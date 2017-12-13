@@ -68,6 +68,12 @@ public class ConfigLoader {
                         op.setAdditionalArguments(new AdditionalArguments());
                     }
                 });
+                if (m.getPatterns() == null) {
+                    m.setPatterns(new Patterns());
+                }
+                if (m.getDontMatchPatterns() == null) {
+                    m.setDontMatchPatterns(new DontMatchPatterns());
+                }
             }
             if (mover.getServers() == null) {
                 mover.setServers(new RsyncMover.Servers());
@@ -83,6 +89,28 @@ public class ConfigLoader {
             }
             if (mover.getMovers().isUseDefaultMatching()) {
                 updateMover(mover, loadBase());
+            }
+            for (final Mover m : mover.getMovers().getMover()) {
+                if (m.getDontMatchMoverByName() != null && !m.getDontMatchMoverByName().getName().isEmpty()) {
+                    final List<Mover> moversNotToMatch = mover.getMovers().getMover().stream()
+                            .filter(m_ -> m.getDontMatchMoverByName().getName().contains(m_.getName())).collect(Collectors.toList());
+                    moversNotToMatch.forEach(m_ -> {
+                        if (m_.getDontMatchPatterns() != null) {
+                            m_.getDontMatchPatterns().getPattern().forEach(p -> {
+                                if (!m.getPatterns().getPattern().contains(p)) {
+                                    m.getPatterns().getPattern().add(p);
+                                }
+                            });
+                        }
+                        if (m_.getPatterns() != null) {
+                            m_.getPatterns().getPattern().forEach(p -> {
+                                if (!m.getDontMatchPatterns().getPattern().contains(p)) {
+                                    m.getDontMatchPatterns().getPattern().add(p);
+                                }
+                            });
+                        }
+                    });
+                }
             }
             return mover;
         } catch (Exception e) {

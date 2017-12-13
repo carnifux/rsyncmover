@@ -2,6 +2,8 @@ package com.carnifex.rsyncmover.mover.operators;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import org.apache.commons.io.FileUtils;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,8 +29,31 @@ public class Delete extends MoveOperator implements StatefulOperator {
 
     @Override
     public Path operateStatefully(final Path from, final Path to, final List<Path> previousPaths) throws IOException {
-        Files.delete(previousPaths.get(indexToDelete));
+        final Path path = previousPaths.get(indexToDelete);
+        try {
+            delete(path);
+        } catch (IOException e) {
+            final String msg = "Error deleting files; continuing";
+            logger.error(msg, e);
+            audit.add(new ErrorEntry(msg, e));
+        }
         return to;
+    }
+
+    private void delete(final Path path) throws IOException {
+        if (Files.isDirectory(path)) {
+            Files.list(path).forEach(p -> {
+                try {
+                    delete(p);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+        if (Files.exists(path)) {
+            logger.trace("Deleting " + path);
+            Files.delete(path);
+        }
     }
 
     @Override

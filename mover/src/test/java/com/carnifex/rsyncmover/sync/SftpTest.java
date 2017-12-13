@@ -11,7 +11,7 @@ public class SftpTest {
 
     @Test
     public void testFormatSize() {
-        final Sftp sftp = new Sftp("", 10, "/", "/", "", "", "", Collections.emptySet());
+        final Sftp sftp = new Sftp("", 10, "/", "/", "", "", "", Collections.emptySet(), -1);
         assertEquals("1B", sftp.formatSize(1));
         assertEquals("1000B", sftp.formatSize(1000));
         assertEquals("100000B", sftp.formatSize(100000));

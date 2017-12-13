@@ -1,5 +1,7 @@
 package com.carnifex.rsyncmover.mover.io;
 
+import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 import com.carnifex.rsyncmover.sync.SyncedFiles;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -30,8 +32,10 @@ public class FileChangeWatcher extends Thread {
     private final boolean isWindows;
     private final MoverThread moverThread;
     private final SyncedFiles syncedFiles;
+    private final Audit audit;
+    private volatile boolean shutdown;
 
-    public FileChangeWatcher(final List<Mover> movers, final MoverThread moverThread, final SyncedFiles syncedFiles) {
+    public FileChangeWatcher(final List<Mover> movers, final MoverThread moverThread, final SyncedFiles syncedFiles, final Audit audit) {
         super("FileChangeWatcher");
         this.filesToMoveSoon = ConcurrentHashMap.newKeySet();
         this.dontReAdd = ConcurrentHashMap.newKeySet();
@@ -39,6 +43,8 @@ public class FileChangeWatcher extends Thread {
         this.movers = movers;
         this.moverThread = moverThread;
         this.syncedFiles = syncedFiles;
+        this.audit = audit;
+        this.shutdown = false;
         this.start();
         logger.info("File change watcher successfully initialized");
     }
@@ -57,6 +63,9 @@ public class FileChangeWatcher extends Thread {
     }
 
     public void submit(final Path path) {
+        if (shutdown) {
+            return;
+        }
         // this class renames the files to find if they're unused, check that we're not adding a file we're renaming
         if (path.toString().endsWith(DO_NOT_ADD_SUFFIX) || dontReAdd.contains(path)) {
             logger.debug("Not adding temporary move file");
@@ -88,8 +97,11 @@ public class FileChangeWatcher extends Thread {
                             moverThread.submit(holder.get(), target, mover.getMoveOperator());
                             syncedFiles.addDownloadedPath("file", holder.get().toString());
                             syncedFiles.finished();
+                            dontReAdd.remove(holder.get());
                         } else {
-                            logger.error("Found multiple movers for file " + holder.get().toString() + "; not moving");
+                            final String msg = "Found multiple movers for file " + holder.get().toString() + "; not moving";
+                            logger.error(msg);
+                            audit.add(new ErrorEntry(msg));
                         }
                     }
                     iterator.remove();
@@ -116,6 +128,18 @@ public class FileChangeWatcher extends Thread {
             return priorities.get(0);
         }
         return null;
+    }
+
+    public void shutdown() {
+        this.shutdown = true;
+        while (!filesToMoveSoon.isEmpty()) {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                logger.debug("", e);
+                return;
+            }
+        }
     }
 
     private final class PathHolder {

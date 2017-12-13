@@ -18,26 +18,31 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MoverThread extends Thread {
 
     private static final Logger logger = LogManager.getLogger();
 
     private final BlockingQueue<PathObject> pathObjectQueue;
+    private final AtomicReference<PathObject> currentObject;
     private final Set<PosixFilePermission> filePermissions;
     private final boolean deleteDuplicateFiles;
     private final Audit audit;
     private volatile boolean shutdown;
+    private volatile boolean shutdownImmediately;
     private volatile boolean moving;
 
     public MoverThread(final Set<PosixFilePermission> filePermissions, final boolean deleteDuplicateFiles, final Audit audit) {
         super("MoverThread");
         this.pathObjectQueue = new LinkedBlockingQueue<>();
+        this.currentObject = new AtomicReference<>();
         this.filePermissions = filePermissions;
         this.deleteDuplicateFiles = deleteDuplicateFiles;
         this.shutdown = false;
         this.moving = false;
         this.audit = audit;
+        audit.addMoverThread(this);
         this.start();
         logger.info("MoverThread initialised");
     }
@@ -47,9 +52,13 @@ public class MoverThread extends Thread {
         for (;;) {
             final PathObject poll;
             try {
-                poll = pathObjectQueue.poll(1, TimeUnit.DAYS);
+                if (shutdown && pathObjectQueue.isEmpty()) {
+                    return;
+                }
+                poll = pathObjectQueue.poll(5, TimeUnit.SECONDS);
                 if (poll != null) {
                     moving = true;
+                    currentObject.set(poll);
                     move(poll);
                     final int remaining = pathObjectQueue.size();
                     if (remaining > 0) {
@@ -57,8 +66,9 @@ public class MoverThread extends Thread {
                     } else {
                         logger.info("Finished moving files");
                     }
+                    currentObject.set(null);
                 }
-                if (this.shutdown) {
+                if (this.shutdownImmediately) {
                     logger.info("Shutting down MoverThread with " + pathObjectQueue.size() + " items left to be moved");
                     return;
                 }
@@ -71,12 +81,25 @@ public class MoverThread extends Thread {
         }
     }
 
-    public void shutdown() {
+    public String getCurrentlyMovingObject() {
+        if (moving) {
+            final PathObject pathObject = currentObject.get();
+            if (pathObject != null) {
+                return this.getName() + ": " + pathObject.getOperator().getMethod() + ": " + pathObject.getFrom() + " -> " + pathObject.getTo();
+            }
+        }
+        return this.getName() + ": Idle";
+    }
+
+    public void shutdown(final boolean immediately) {
         logger.info("Registering shutdown, " + pathObjectQueue.size() + " items left in queue");
         this.shutdown = true;
-        if (!pathObjectQueue.isEmpty() || moving) {
+        if (immediately) {
+            this.shutdownImmediately = true;
+        }
+        if (!pathObjectQueue.isEmpty()) {
             logger.info("Waiting for file move to finish before shutdown");
-            while (moving && !pathObjectQueue.isEmpty()) {
+            while (!pathObjectQueue.isEmpty()) {
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {
@@ -97,22 +120,20 @@ public class MoverThread extends Thread {
 
     private void move(final PathObject pathObject) {
         try {
-            if (deleteDuplicateFiles && pathObject.getTo().toFile().exists()) {
-                logger.warn("Deleting duplicate files");
+            if (deleteDuplicateFiles && pathObject.getTo().toFile().exists()
+                    && Files.size(pathObject.getFrom()) < Files.size(pathObject.getTo())) {
+                logger.warn("Deleting duplicate files - " + pathObject.getFrom() + " to " + pathObject.getTo());
                 if (pathObject.getTo().toFile().isDirectory()) {
                     FileUtils.deleteDirectory(pathObject.getTo().toFile());
                 } else {
                     Files.delete(pathObject.getTo());
                 }
-                audit.add(new DuplicateEntry(pathObject.getTo().toString()));
+                audit.add(new DuplicateEntry(pathObject.getTo().toAbsolutePath().toString()));
             }
             logger.info("Moving " + pathObject.getFrom() + " to " + pathObject.getTo() + " with operator " + pathObject.getOperator().getMethod());
             final Path finalDir = pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions);
             logger.info("Move of " + pathObject.getFrom() + " finished; ended up at " + finalDir + ". " + pathObjectQueue.size() + " items remaining");
-            audit.add(new MovedEntry(pathObject.getFrom().toString(), finalDir.toString(), pathObject.getOperator().getMethod()));
-            if (filePermissions != null && pathObject.getOperator().shouldSetFilePermissions()) {
-                Permissions.setPermissions(finalDir, filePermissions);
-            }
+            audit.add(new MovedEntry(pathObject.getFrom().toAbsolutePath().toString(), finalDir.toAbsolutePath().toString(), pathObject.getOperator().getMethod()));
         } catch (Exception e) {
             final String s = pathObject.getOperator().getMethod() + ": Error moving from " + pathObject.getFrom().toString() + " to " + pathObject.getTo().toString();
             logger.error(s, e);
@@ -143,5 +164,6 @@ public class MoverThread extends Thread {
         private MoveOperator getOperator() {
             return operator;
         }
+
     }
 }

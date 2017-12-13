@@ -3,6 +3,7 @@
     <xs:element name="rsyncMover">
         <xs:complexType>
             <xs:sequence>
+                <xs:element name="runOnce" maxOccurs="1" minOccurs="0" default="false" type="xs:boolean"/>
                 <xs:element name="watches">
                     <xs:complexType>
                         <xs:sequence>
@@ -185,7 +186,7 @@
                                                 </xs:documentation>
                                             </xs:annotation>
                                         </xs:element>
-                                        <xs:element name="moveOperators" maxOccurs="1" minOccurs="1">
+                                        <xs:element name="moveOperators" maxOccurs="1" minOccurs="0">
                                             <xs:complexType>
                                                 <xs:sequence>
                                                     <xs:element name="moveOperator" maxOccurs="unbounded" minOccurs="0">
@@ -277,6 +278,8 @@
                                     <xs:documentation>how often to check for new files</xs:documentation>
                                 </xs:annotation>
                             </xs:element>
+                            <xs:element type="xs:int" name="maxConcurrentDownloads" default="1" minOccurs="0" maxOccurs="1"/>
+                            <xs:element type="xs:string" name="maxDownloadSpeed" minOccurs="0" maxOccurs="1" default="-1"/>
                             <xs:element name="server" minOccurs="0" maxOccurs="unbounded">
                                 <xs:annotation>
                                     <xs:documentation>each server defines a single folder on a single server
@@ -284,7 +287,7 @@
                                 </xs:annotation>
                                 <xs:complexType>
                                     <xs:sequence>
-                                        <xs:element type="xs:string" name="name" maxOccurs="1" minOccurs="1">
+                                        <xs:element type="xs:string" name="name" maxOccurs="1" minOccurs="0">
                                             <xs:annotation>
                                                 <xs:documentation>name for the server. only needed if you're using
                                                     multiple servers with the same host name

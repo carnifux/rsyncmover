@@ -9,7 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Validate extends MoveOperator implements StatefulOperator {
 
@@ -39,14 +41,9 @@ public class Validate extends MoveOperator implements StatefulOperator {
             return to;
         }
         final Path previous = previousPaths.get(previousPaths.size() - 2);
-        final String previousHash;
-        final String currentHash;
-        try {
-            previousHash = hash(previous);
-            currentHash = hash(from);
-        } catch (IOException | NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
+        final String previousHash = hash(previous);
+        final String currentHash = hash(from);
+
         logger.debug("Previous hash: " + previousHash + "; new hash: " + currentHash);
         if (!previousHash.equals(currentHash)) {
             throw new RuntimeException("Hashes of files " + from + ", " + previous + " do not match; " + previousHash + ", " + currentHash);
@@ -54,15 +51,25 @@ public class Validate extends MoveOperator implements StatefulOperator {
         return to;
     }
 
-    private String hash(final Path path) throws IOException, NoSuchAlgorithmException {
-        try (final InputStream inputStream = Files.newInputStream(path)) {
-            final MessageDigest messageDigest = MessageDigest.getInstance("SHA1");
-            int r;
-            final byte[] b = new byte[1024];
-            while ((r = inputStream.read(b)) != -1) {
-                messageDigest.update(b, 0, r);
+    private String hash(final Path path) {
+        try {
+            if (Files.isDirectory(path)) {
+                return Files.list(path).sorted().parallel().map(this::hash).collect(Collectors.joining());
             }
-            return new String(messageDigest.digest());
+            try (final InputStream inputStream = Files.newInputStream(path)) {
+                logger.trace("Started hashing " + path);
+                final MessageDigest messageDigest = MessageDigest.getInstance("SHA1");
+                int r;
+                final byte[] b = new byte[1024];
+                while ((r = inputStream.read(b)) != -1) {
+                    messageDigest.update(b, 0, r);
+                }
+                final String hash = Base64.getEncoder().encodeToString(messageDigest.digest());
+                logger.trace("Hashed path " + path + ": " + hash);
+                return hash;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 }

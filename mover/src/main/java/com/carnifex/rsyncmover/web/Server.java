@@ -41,9 +41,7 @@ public class Server extends NanoHTTPD {
     @Override
     public Response serve(final IHTTPSession session) {
         final String uri = session.getUri();
-        if (uri.endsWith("downloadstatus")) {
-            return newFixedLengthResponse(audit.getDownloadWatcherStatuses());
-        } else if (uri.endsWith("findmoverfor")) {
+        if (uri.endsWith("findmoverfor")) {
             try {
                 final HashMap<String, String> map = new HashMap<>();
                 session.parseBody(map);
@@ -65,6 +63,12 @@ public class Server extends NanoHTTPD {
                 syncer.interrupt();
             }
             return newFixedLengthResponse("");
+        } else if (uri.endsWith("movestatus")) {
+            return newFixedLengthResponse(audit.getMoveStatus());
+        } else if (uri.endsWith("downloadstatus")) {
+            return newFixedLengthResponse(audit.getDownloadWatcherStatuses());
+        } else if (uri.endsWith("downloadqueuestatus")) {
+            return newFixedLengthResponse(audit.getDownloadQueueStatus());
         } else {
             return newFixedLengthResponse(audit.formatAll());
         }

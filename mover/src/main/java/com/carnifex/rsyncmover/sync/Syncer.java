@@ -20,6 +20,8 @@ import java.text.Normalizer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class Syncer extends Thread {
@@ -40,10 +42,13 @@ public class Syncer extends Thread {
     private final boolean lazyPolling;
     private final List<FileWatcher> fileWatchers;
     private final Audit audit;
+    private final ExecutorService executorService;
+    private final boolean isWindows;
 
     public Syncer(final List<String> dlDirs, final List<Sftp> sftps, final SyncedFiles syncedFiles, final int syncFrequency,
                   final boolean passivateEachTime, final long minimumSpace, final Set<PosixFilePermission> filePermissions,
-                  final boolean downloadsMustMatchMover, final List<Mover> movers, final boolean lazyPolling, final List<FileWatcher> fileWatchers, final Audit audit) {
+                  final boolean downloadsMustMatchMover, final List<Mover> movers, final boolean lazyPolling, final int maxConcurrentDownloads,
+                  final boolean runOnce, final List<FileWatcher> fileWatchers, final Audit audit) {
         super("Syncer");
         this.dlDirs = dlDirs;
         dlDirs.forEach(dir -> {
@@ -67,11 +72,19 @@ public class Syncer extends Thread {
         this.filePermissions = filePermissions;
         this.lazyPolling = lazyPolling;
         this.fileWatchers = fileWatchers != null ? fileWatchers : Collections.emptyList();
+        final AtomicInteger threadIndex = new AtomicInteger(0);
+        this.executorService = new ThreadPoolExecutor(maxConcurrentDownloads, maxConcurrentDownloads,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                r -> new Thread(r, "DownloadThread" + threadIndex.getAndIncrement()));
 
         this.running = true;
         this.sleeping = false;
         this.syncing = false;
-        this.start();
+        this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        if (!runOnce) {
+            this.start();
+        }
     }
 
     public void sync() {
@@ -103,7 +116,7 @@ public class Syncer extends Thread {
                             shouldDownload.stream().map(this::normalize).collect(Collectors.joining(",")));
                     final String dlDir = getDlDir();
                     sftp.downloadFiles(shouldDownload, dlDir, path -> {
-                        if (filePermissions != null) {
+                        if (filePermissions != null && !isWindows) {
                             try {
                                 Files.setPosixFilePermissions(Paths.get(dlDir + File.separator + path), filePermissions);
                             } catch (Exception e) {
@@ -114,7 +127,7 @@ public class Syncer extends Thread {
                         }
                         syncedFiles.addDownloadedPath(sftp.getServerName(), normalize(path));
                         audit.add(new DownloadedEntry(path, sftp.getServerName()));
-                    });
+                    }, executorService);
                     downloaded = true;
                 }
             } catch (Exception e) {
@@ -178,21 +191,15 @@ public class Syncer extends Thread {
     }
 
     public void shutdown() {
-        if (!sleeping) {
-            logger.info("Waiting for downloads to finish before shutting down thread");
-            while (!sleeping) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    logger.error("Syncer shutdown interrupted whilst waiting for download to finish", e);
-                    break;
-                }
-            }
-            logger.info("Downloads finished, shutting down thread");
-        }
-        syncedFiles.finished();
         this.running = false;
-        this.interrupt();
+        syncedFiles.finished();
+    }
+
+    public void forceShutdown() {
+        final List<Runnable> runnables = executorService.shutdownNow();
+        if (!runnables.isEmpty()) {
+            logger.warn("Interrupted " + runnables.size() + " download tasks");
+        }
     }
 
 }

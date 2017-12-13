@@ -41,8 +41,7 @@ public abstract class MoveOperator {
     public abstract boolean shouldSetFilePermissions();
 
     protected MoveOperator() {
-        this.audit = null;
-        this.isWindows = false;
+        this(null, null);
     }
 
     protected MoveOperator(final Audit audit, final List<String> additionalArguments) {
@@ -67,24 +66,16 @@ public abstract class MoveOperator {
         final boolean mkdirs = parent.toFile().mkdirs();
         if (mkdirs) {
             logger.debug(getMethod() + ": Created directories for move " + parent.toString());
-            if (filePermissions != null) {
+            if (filePermissions != null && !isWindows) {
                 Permissions.setPermissions(parent, filePermissions);
             }
         }
         final Path path = operate(from, to);
-        log(path);
-        logger.info("Moved " + from + " in " + (System.currentTimeMillis() - startTime) / 1000 + "ms");
-        return path;
-    }
-
-    private void log(final Path path) {
-        logger.info(getMethod() + ": Finished moving " + path);
-        final String message = LocalDateTime.now().toString() + " " + path.getFileName() + "\n";
-        try {
-            Files.write(path.getParent().resolve("rsync_mover.log"), message.getBytes(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
-        } catch (IOException e) {
-            logger.error(getMethod() + ": Error writing log for " + path.toString(), e);
+        logger.info("Moved " + from + " in " + (System.currentTimeMillis() - startTime) / 1000 + "s");
+        if (filePermissions != null && shouldSetFilePermissions() && !isWindows) {
+            Permissions.setPermissions(path, filePermissions);
         }
+        return path;
     }
 
     public static MoveOperator create(final List<RsyncMover.Movers.Mover.MoveOperators.MoveOperator> operators, final Audit audit) {

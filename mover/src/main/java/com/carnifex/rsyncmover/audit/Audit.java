@@ -2,6 +2,8 @@ package com.carnifex.rsyncmover.audit;
 
 import com.carnifex.rsyncmover.audit.entry.Entry;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import com.carnifex.rsyncmover.mover.io.MoverThread;
+import com.carnifex.rsyncmover.sync.Sftp;
 import com.carnifex.rsyncmover.sync.Sftp.DownloadWatcher;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -20,15 +22,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -43,8 +37,7 @@ import static com.carnifex.rsyncmover.audit.Type.SEEN;
 
 public class Audit extends Thread {
 
-    private static final String HEADERS = "";
-    private static final List<Type> types = Arrays.asList(ERROR, DUPLICATE, MOVED, DOWNLOADED, SEEN);
+    private static final List<Type> types = Arrays.asList(Type.values());
     private static final long persistInterval = 5 * 1000 * 60; // 5 minutes
     private static final Logger logger = LogManager.getLogger();
     private final Map<Type, Set<Entry>> allEntries;
@@ -57,7 +50,9 @@ public class Audit extends Thread {
     private volatile long nextPersist;
     private volatile boolean needToPersist;
     private volatile boolean persisted;
-    private transient List<DownloadWatcher> downloadWatchers;
+    private final transient List<DownloadWatcher> downloadWatchers;
+    private final transient List<Sftp> sftps;
+    private final transient List<MoverThread> moverThreads;
 
     public Audit(final boolean persist, final String persistLocation, final Audit old) {
         super("AuditThread");
@@ -78,6 +73,8 @@ public class Audit extends Thread {
         this.needToPersist = false;
         this.persisted = true;
         this.downloadWatchers = new ArrayList<>();
+        this.sftps = new ArrayList<>();
+        this.moverThreads = new ArrayList<>();
         if (persist) {
             this.start();
         }
@@ -86,6 +83,20 @@ public class Audit extends Thread {
 
     public void addDownloadWatcher(final DownloadWatcher downloadWatcher) {
         this.downloadWatchers.add(downloadWatcher);
+    }
+
+    public void addMoverThread(final MoverThread moverThread) {
+        this.moverThreads.add(moverThread);
+    }
+
+    public void addSftp(final Sftp sftp) {
+        this.sftps.add(sftp);
+    }
+
+    public void resetTransients() {
+        this.downloadWatchers.clear();
+        this.sftps.clear();
+        this.moverThreads.clear();
     }
 
     public void shutdown() {
@@ -121,8 +132,8 @@ public class Audit extends Thread {
         logger.debug("Persisting audit");
         lock.lock();
         final Map<Type, Set<Entry>> map = readPersistedFile();
-        final int fileSize = (int) map.values().stream().flatMap(Collection::stream).count();
-        final int memorySize = (int) allEntries.values().stream().flatMap(Collection::stream).count();
+        final int fileSize = (int) map.values().stream().mapToLong(Collection::size).sum();
+        final int memorySize = (int) allEntries.values().stream().mapToLong(Collection::size).sum();
         if (fileSize != memorySize) {
             final int entriesAdded = addEntriesToMap(allEntries, map);
             FileOutputStream fileOut = null;
@@ -213,12 +224,21 @@ public class Audit extends Thread {
     public String formatAll() {
         addEntriesToMap(readPersistedFile(), allEntries);
         final StringBuilder message = new StringBuilder();
-        message.append("<html><body>");
+        message.append("<html><head><style>" +
+                "body {\n" +
+                        "\tfont-family: helvetica;font-size:0.8em;\n" +
+                        "}</style></head>" +
+                "<body>");
         message.append(makeUptime(startTime));
         // i really need to rewrite this
-        message.append("<div id=\"status\" style=\"height:200px\"></div>")
-                .append("<script>var prev = \"\";\n" +
-                        "var f = function() {\n" +
+        message.append("<div id=\"status\" style=\"height:50px\"></div>" +
+                "<div id=\"downloadqueuestatus\" style=\"height:50px\"></div>" +
+                "<div id=\"movestatus\" style=\"height:50px\"></div>" +
+                "<script src=\"https://code.jquery.com/jquery-3.2.0.slim.min.js\"></script>" +
+                "<script>\n" +
+                        "\n" +
+                        "var prev = \"\";\n" +
+                        "var updateDownloads = function() {\n" +
                         "    var req = new XMLHttpRequest();\n" +
                         "    req.onreadystatechange = function() {\n" +
                         "        var res = req.responseText;\n" +
@@ -229,9 +249,23 @@ public class Audit extends Thread {
                         "    }\n" +
                         "    req.open(\"GET\", window.location.href + \"/downloadstatus\", true);\n" +
                         "    req.send(null);\n" +
-                        "    setTimeout(f, 1000);\n" +
+                        "    setTimeout(updateDownloads, 1000);\n" +
                         "};\n" +
-                        "setTimeout(f, 1000);\n" +
+                        "updateDownloads();\n" +
+                        "var updateDownloadQueues = function() {\n" +
+                        "    var req = new XMLHttpRequest();\n" +
+                        "    req.onreadystatechange = function() {\n" +
+                        "        var res = req.responseText;\n" +
+                        "        if (prev !== res) {\n" +
+                        "            document.getElementById(\"downloadqueuestatus\").innerHTML = res;\n" +
+                        "        }\n" +
+                        "        prev = res;\n" +
+                        "    }\n" +
+                        "    req.open(\"GET\", window.location.href + \"/downloadqueuestatus\", true);\n" +
+                        "    req.send(null);\n" +
+                        "    setTimeout(updateDownloadQueues, 1000);\n" +
+                        "};\n" +
+                        "updateDownloadQueues();\n" +
                         "\n" +
                         "var callSync = function() {\n" +
                         "   var req = new XMLHttpRequest();\n" +
@@ -240,28 +274,51 @@ public class Audit extends Thread {
                         "   setTimeout(location.reload(), 500);\n" +
                         "};\n" +
                         "\n" +
-                                "var testMover = function() {\n" +
-                                "    var req = new XMLHttpRequest();\n" +
-                                "    var value = document.getElementById(\"testmover\").value;" +
-                                "    req.onreadystatechange = function() {\n" +
-                                "        var res = req.responseText;\n" +
-                                "        if (prev !== res) {\n" +
-                                "            document.getElementById(\"testmoverdiv\").innerHTML = res;\n" +
-                                "        }\n" +
-                                "        prev = res;\n" +
-                                "    }\n" +
-                                "    req.open(\"POST\", window.location.href + \"/findmoverfor\", true);\n" +
-                                "    req.send(value);\n" +
-                                "}"+
-                        "</script>");
-        message.append("<button onclick=\"callSync()\">Check Servers</button>");
-        message.append("<div id=\"testmoverdiv\"></div>\n").append("<input type=\"text\" id=\"testmover\" /><button onclick=\"testMover()\">Test Mover</button>");
+                        "var testMover = function() {\n" +
+                        "    var req = new XMLHttpRequest();\n" +
+                        "    var value = document.getElementById(\"testmover\").value;    req.onreadystatechange = function() {\n" +
+                        "        var res = req.responseText;\n" +
+                        "        if (prev !== res) {\n" +
+                        "            document.getElementById(\"testmoverdiv\").innerHTML = res;\n" +
+                        "        }\n" +
+                        "        prev = res;\n" +
+                        "    }\n" +
+                        "    req.open(\"POST\", window.location.href + \"/findmoverfor\", true);\n" +
+                        "    req.send(value);\n" +
+                        "}\n" +
+                        "var prevmove = \"\";\n" +
+                        "var updateMovers = function() {\n" +
+                        "    var req = new XMLHttpRequest();\n" +
+                        "    req.onreadystatechange = function() {\n" +
+                        "        var res = req.responseText;\n" +
+                        "        if (prevmove !== res) {\n" +
+                        "            document.getElementById(\"movestatus\").innerHTML = res;\n" +
+                        "        }\n" +
+                        "        prevmove = res;\n" +
+                        "    }\n" +
+                        "    req.open(\"GET\", window.location.href + \"/movestatus\", true);\n" +
+                        "    req.send(null);\n" +
+                        "    setTimeout(updateMovers, 1000);\n" +
+                        "};\n" +
+                        "updateMovers();\n" +
+                        "\n" +
+                        "\n" +
+                        "</script><button onclick=\"callSync()\">Check Servers</button><div id=\"testmoverdiv\"></div>\n" +
+                        "<input type=\"text\" id=\"testmover\" /><button onclick=\"testMover()\">Test Mover</button>");
         types.stream().filter(allEntries::containsKey).forEachOrdered(type -> {
             message.append(makeTitle(type));
             message.append(makeContent(allEntries.get(type)));
+            message.append("</div></div>");
         });
         message.append("</body></html>");
-        return String.format(HEADERS, message.length()) + message.toString();
+        return message.toString();
+    }
+
+    public String getMoveStatus() {
+        return moverThreads.stream()
+                .map(mt -> mt.getCurrentlyMovingObject())
+                .map(s -> "<span>" + s + "</span>")
+                .collect(Collectors.joining("<br />"));
     }
 
     public String formatEmail() {
@@ -271,6 +328,7 @@ public class Audit extends Thread {
         types.stream().filter(dailyEntries::containsKey).forEachOrdered(type -> {
             message.append(makeEmailTitle(type));
             message.append(makeEmailContent(dailyEntries.get(type)));
+            message.append("</div></div>");
         });
         message.append("</body></html>");
         return message.toString();
@@ -316,11 +374,11 @@ public class Audit extends Thread {
     }
 
     private String makeTitle(final Type type) {
-        return "<br />================" + type.toString() + "================<br /><br />";
+        return "<div id=\"" + type.toString() + "\" onclick=\"$('#" + type.toString() + "').children('.child').first().toggle();\"><br /><b>================" + type.toString() + "================</b><br /><br /><div class=\"child\">";
     }
 
     private String makeEmailTitle(final Type type) {
-        return "<br />================" + type.toString() + "================<br /><br />";
+        return "<br /><b>================" + type.toString() + "================</b><br /><br />";
     }
 
     public void accessing() {
@@ -363,8 +421,15 @@ public class Audit extends Thread {
 
     public String getDownloadWatcherStatuses() {
         return downloadWatchers.stream()
-                .filter(DownloadWatcher::isCurrentlyActive)
-                .map(DownloadWatcher::getMessage)
-                .collect(Collectors.joining("<br />")) + "<br /><br /><br />";
+                .map(downloadWatcher -> downloadWatcher.getName() + ": " + (downloadWatcher.isCurrentlyActive() ? downloadWatcher.getMessage() : "Idle"))
+                .map(msg -> "<span>" + msg + "</span>")
+                .collect(Collectors.joining("<br />"));
+    }
+
+    public String getDownloadQueueStatus() {
+        return sftps.stream()
+                .map(sftp -> sftp.getServerName() + sftp.getFilesInQueue().stream().collect(Collectors.joining("<br />")))
+                .map(msg -> "<span>" + msg + "</span>")
+                .collect(Collectors.joining("<br />"));
     }
 }

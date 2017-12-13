@@ -24,7 +24,7 @@ public class MovedEntry extends Entry {
     @Override
     public String format() {
         final String moveTarget;
-        if (operation.startsWith("filebot")) {
+        if (operation.contains("filebot")) {
             moveTarget = to.substring(to.indexOf(File.separator), to.length());
         } else {
             final List<Integer> separators = new ArrayList<>();
