@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -18,17 +19,24 @@ public class Permissions {
 
     private Permissions() {}
 
-    public static void setPermissions(final Path path, final Set<PosixFilePermission> permissions) {
+    public static void setPermissions(final Path path, final Set<PosixFilePermission> filePermissions, final Set<PosixFilePermission> folderPermissions, final UserPrincipal userPrincipal) {
         try {
-            Files.setPosixFilePermissions(path, permissions);
+            if (Files.isDirectory(path)) {
+                Files.setPosixFilePermissions(path, folderPermissions);
+            } else {
+                Files.setPosixFilePermissions(path, filePermissions);
+            }
+            if (userPrincipal != null) {
+                Files.setOwner(path, userPrincipal);
+            }
         } catch (IOException e) {
             logger.warn("Error setting file permissions on " + path, e);
         }
-        final File file = path.toFile();
-        if (file.isDirectory()) {
-            final File[] files = file.listFiles();
-            if (files != null) {
-                Stream.of(files).map(File::toPath).forEach(p -> setPermissions(p, permissions));
+        if (Files.isDirectory(path)) {
+            try {
+                Files.list(path).forEach(p -> setPermissions(p, filePermissions, folderPermissions, userPrincipal));
+            } catch (IOException e) {
+                logger.warn("Error setting file permissions on " + path, e);
             }
         }
     }

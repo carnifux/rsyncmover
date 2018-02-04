@@ -34,8 +34,6 @@ public class FastMove extends MoveOperator {
         if (!errors.isEmpty()) {
             throw new RuntimeException();
         }
-        // set permissions to something reasonable
-        Permissions.setPermissions(to, PosixFilePermissions.fromString("rwxr--r--"));
         return to;
     }
 

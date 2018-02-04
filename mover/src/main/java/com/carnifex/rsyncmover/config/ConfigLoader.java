@@ -205,6 +205,7 @@ public class ConfigLoader {
             unmarshaller.unmarshal(path.toFile());
         } catch (Exception e) {
             logger.error("Config validation failed", e);
+            logger.warn("Loading potentially invalid config");
         }
         final Unmarshaller unmarshaller = getUnmarshaller();
         return (RsyncMover) unmarshaller.unmarshal(path.toFile());

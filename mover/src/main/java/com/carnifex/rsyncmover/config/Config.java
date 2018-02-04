@@ -10,10 +10,10 @@ import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.LoggerConfig;
 
 import javax.xml.bind.annotation.XmlElement;
-import java.lang.annotation.Annotation;
+import java.io.IOException;
 import java.lang.reflect.Field;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.FileSystems;
+import java.nio.file.attribute.*;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
@@ -66,6 +66,18 @@ public class Config {
 
     public boolean shouldWriteLogFile() {
         return config.getMovers().isWriteLogFile();
+    }
+
+    public UserPrincipal getUserPrincipal() {
+        final String user = config.getMovers().getMovedFileUser();
+        if (user != null) {
+            try {
+                return FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName(user);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return null;
     }
 
     public boolean killDownloadOnExit() {
@@ -127,6 +139,11 @@ public class Config {
 
     public Set<PosixFilePermission> getFilePermissions() {
         final String permissions = config.getMovers().getMovedFilePermissions();
+        return permissions != null ? PosixFilePermissions.fromString(permissions) : null;
+    }
+
+    public Set<PosixFilePermission> getFolderPermissions() {
+        final String permissions = config.getMovers().getMovedFolderPermissions();
         return permissions != null ? PosixFilePermissions.fromString(permissions) : null;
     }
 

@@ -85,6 +85,7 @@ public class FileBot extends MoveOperator {
 
     @Override
     protected Path operate(final Path from, final Path to) throws IOException {
+        logger.info("Using filebot on " + from);
         // if we couldn't find the filebot path, then return the file we moved
         return exec(to, filebotPath, RENAME, preparePath(to)).orElse(to);
     }

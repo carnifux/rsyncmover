@@ -51,7 +51,7 @@ public class Server extends NanoHTTPD {
                         .sorted((a, b) -> -Integer.compare(a.getPriority(), b.getPriority()))
                         .findFirst();
                 if (chosen.isPresent()) {
-                    return newFixedLengthResponse(chosen.get().getName());
+                    return newFixedLengthResponse(chosen.get().getName() + ": " + chosen.get().getTarget(Paths.get(content)).toAbsolutePath().toString());
                 }
                 return newFixedLengthResponse("No movers matched");
             } catch (Exception e) {

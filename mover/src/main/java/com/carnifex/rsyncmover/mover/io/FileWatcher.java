@@ -44,6 +44,7 @@ public class FileWatcher extends Thread {
             watcher = null;
         } else if (lazyPolling) {
             this.watcher = null;
+            logger.info("File watcher initialized lazily, watching " + dir);
         } else {
             try {
                 this.watcher = FileSystems.getDefault().newWatchService();
@@ -52,8 +53,8 @@ public class FileWatcher extends Thread {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+            logger.info("File watcher initialized, watching " + dir);
         }
-        logger.info("File watcher initialized, watching " + dir);
     }
 
     @Override

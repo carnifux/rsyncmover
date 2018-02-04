@@ -15,6 +15,7 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -27,28 +28,16 @@ public class Emailer extends Thread {
     private final boolean enabled;
     private final String to;
     private final String from;
-    private final Properties properties;
     private final LocalTime timeToSendEmail;
     private final Audit audit;
 
     public Emailer(final boolean enabled, final String to, final String from, final LocalTime timeToSendEmail, final Audit audit) {
         super("Emailer");
-        this.enabled = true;
+        this.enabled = enabled;
         this.to = to;
         this.from = from;
         this.timeToSendEmail = timeToSendEmail;
         this.audit = audit;
-
-        this.properties = new Properties();
-        if (enabled) {
-            this.properties.put("mail.transport.protocol", "smtp");
-            final String mxRecord = getMXRecordsForEmailAddress(to);
-            logger.debug("Found host address for email " + to + " as " + mxRecord);
-            this.properties.put("mail.smtp.host", "relay.plus.net");
-            this.properties.put("mail.smtp.port", "25");
-            this.properties.put("mail.smtp.from", from);
-            this.properties.put("mail.smtp.allow8bitmime", "true");
-        }
     }
 
     @Override
@@ -81,6 +70,15 @@ public class Emailer extends Thread {
             return;
         }
         try {
+            final Properties properties = new Properties();
+            properties.put("mail.transport.protocol", "smtp");
+            final String mxRecord = getMXRecordsForEmailAddress(to);
+            logger.debug("Found host address for email " + to + " as " + mxRecord);
+            properties.put("mail.smtp.host", "relay.plus.net");
+            properties.put("mail.smtp.port", "25");
+            properties.put("mail.smtp.from", from);
+            properties.put("mail.smtp.allow8bitmime", "true");
+
             final Session session = Session.getInstance(properties);
             final MimeMessage message = new MimeMessage(session);
             message.setFrom(new InternetAddress(String.format("\"%s\"<%s>", from, from)));
@@ -111,7 +109,7 @@ public class Emailer extends Thread {
 
             return Stream.of(records)
                     .map(record -> (MXRecord) record)
-                    .sorted((a, b) -> Integer.compare(a.getPriority(), b.getPriority()))
+                    .sorted(Comparator.comparingInt(MXRecord::getPriority))
                     .findFirst()
                     .map(MXRecord::getTarget)
                     .map(Name::toString)

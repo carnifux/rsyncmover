@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -31,7 +32,7 @@ public abstract class MoveOperator {
     protected static final Logger logger = LogManager.getLogger();
     private static final Map<String, Class<? extends MoveOperator>> operators = new HashMap<>();
     private static final Map<String, MoveOperator> instantiatedOperators = new HashMap<>();
-    private static final String PACKAGE_NAME = "com.carnifex.rsyncmover.mover.operators";
+    private static final String PACKAGE_NAME = MoveOperator.class.getPackage().getName();
     public static final String DEFAULT_OPERATOR = "move";
     protected final Audit audit;
     protected final boolean isWindows;
@@ -49,7 +50,7 @@ public abstract class MoveOperator {
         this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
     }
 
-    public Path move(final Path from, final Path to, final Set<PosixFilePermission> filePermissions) throws IOException {
+    public Path move(final Path from, final Path to, final Set<PosixFilePermission> filePermissions, final Set<PosixFilePermission> folderPermissions, final UserPrincipal userPrincipal) throws IOException {
         final long startTime = System.currentTimeMillis();
         if (from.equals(to)) {
             final String msg = getMethod() + ": Origin and destination are the same, not moving: " + to;
@@ -67,13 +68,13 @@ public abstract class MoveOperator {
         if (mkdirs) {
             logger.debug(getMethod() + ": Created directories for move " + parent.toString());
             if (filePermissions != null && !isWindows) {
-                Permissions.setPermissions(parent, filePermissions);
+                Permissions.setPermissions(parent, filePermissions, folderPermissions, userPrincipal);
             }
         }
         final Path path = operate(from, to);
         logger.info("Moved " + from + " in " + (System.currentTimeMillis() - startTime) / 1000 + "s");
         if (filePermissions != null && shouldSetFilePermissions() && !isWindows) {
-            Permissions.setPermissions(path, filePermissions);
+            Permissions.setPermissions(path, filePermissions, folderPermissions, userPrincipal);
         }
         return path;
     }

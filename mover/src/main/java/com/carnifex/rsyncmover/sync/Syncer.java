@@ -110,24 +110,33 @@ public class Syncer extends Thread {
                         .collect(Collectors.toList());
 
                 if (shouldDownload.isEmpty()) {
-                    logger.info(sftp.getServerName() + ": Nothing new to download, finishing");
+                    logger.debug(sftp.getServerName() + ": Nothing new to download, finishing");
                 } else {
                     logger.info(sftp.getServerName() + ": Downloading following files, as haven't been seen before: " +
                             shouldDownload.stream().map(this::normalize).collect(Collectors.joining(",")));
                     final String dlDir = getDlDir();
-                    sftp.downloadFiles(shouldDownload, dlDir, path -> {
-                        if (filePermissions != null && !isWindows) {
-                            try {
-                                Files.setPosixFilePermissions(Paths.get(dlDir + File.separator + path), filePermissions);
-                            } catch (Exception e) {
-                                final String msg = sftp.getServerName() + ": Error setting file permissions on downloaded files";
-                                logger.error(msg, e);
-                                audit.add(new ErrorEntry(msg, e));
-                            }
+                    for (final String fileToDownload : shouldDownload) {
+                        try {
+                            final long start = System.currentTimeMillis();
+                            sftp.downloadFiles(Collections.singletonList(fileToDownload), dlDir, path -> {
+                                if (filePermissions != null && !isWindows) {
+                                    try {
+                                        Files.setPosixFilePermissions(Paths.get(dlDir + File.separator + path), filePermissions);
+                                    } catch (Exception e) {
+                                        final String msg = sftp.getServerName() + ": Error setting file permissions on downloaded files";
+                                        logger.error(msg, e);
+                                        audit.add(new ErrorEntry(msg, e));
+                                    }
+                                }
+                                syncedFiles.addDownloadedPath(sftp.getServerName(), normalize(path));
+                                audit.add(new DownloadedEntry(path, sftp.getServerName()));
+                            }, executorService);
+                            logger.info("Finished downloading " + fileToDownload + " in " + (System.currentTimeMillis() - start) / 1000 + "ms");
+                        } catch (Exception e) {
+                            logger.error(e.getMessage(), e);
+                            audit.add(new ErrorEntry("Error downloading " + fileToDownload, e));
                         }
-                        syncedFiles.addDownloadedPath(sftp.getServerName(), normalize(path));
-                        audit.add(new DownloadedEntry(path, sftp.getServerName()));
-                    }, executorService);
+                    }
                     downloaded = true;
                 }
             } catch (Exception e) {
@@ -136,7 +145,7 @@ public class Syncer extends Thread {
                 audit.add(new ErrorEntry(msg, e));
             }
         }
-        logger.info("Finished downloading new files");
+        logger.debug("Finished downloading new files");
         if (passivateEachTime) {
             syncedFiles.finished();
         }
@@ -173,9 +182,11 @@ public class Syncer extends Thread {
                 if (!running) {
                     break;
                 }
+                final long start = System.currentTimeMillis();
                 sync();
                 sleeping = true;
-                Thread.sleep(syncFrequency);
+                // don't sleep for exactly sync frequency if we were downloading for hours, just check again immediately
+                Thread.sleep(Math.max(0, (syncFrequency - (System.currentTimeMillis() - start))));
             } catch (InterruptedException e) {
                 logger.debug("Interrupted", e);
             }

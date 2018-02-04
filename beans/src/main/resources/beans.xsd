@@ -59,6 +59,21 @@
                                     </xs:documentation>
                                 </xs:annotation>
                             </xs:element>
+                            <xs:element type="xs:string" name="movedFolderPermissions" minOccurs="0" maxOccurs="1">
+                                <xs:annotation>
+                                    <xs:documentation>set from permissions for files moved and downloaded, as a posix
+                                        string
+                                        only needed on linux, don't set on windows
+                                    </xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
+                            <xs:element type="xs:string" name="movedFileUser" minOccurs="0" maxOccurs="1">
+                                <xs:annotation>
+                                    <xs:documentation>set user for files moved and downloaded, for eg "nobody:users"
+                                        only needed on linux, don't set on windows
+                                    </xs:documentation>
+                                </xs:annotation>
+                            </xs:element>
                             <xs:element type="xs:string" name="passivateLocation" maxOccurs="1" minOccurs="0">
                                 <xs:annotation>
                                     <xs:documentation>location of passivate from, required if downloadFiles = true

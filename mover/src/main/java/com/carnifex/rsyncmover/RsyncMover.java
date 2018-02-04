@@ -29,7 +29,7 @@ public class RsyncMover {
     private static final Map<Class<?>, Object> components = new ConcurrentHashMap<>();
     private static Config currentConfig;
 
-
+    // TODO i should just use spring
     @SuppressWarnings("unchecked")
     public static void main(String[] args) {
         final String configPath = args != null && args.length > 0 ? args[0] : "config.xml";
@@ -40,6 +40,7 @@ public class RsyncMover {
             components.put(ConfigWatcher.class, configWatcher);
         }
         if (config.isRunOnce()) {
+            logger.info("Running once.");
             if (config.downloadFiles()) {
                 final Syncer syncer = (Syncer) components.get(Syncer.class);
                 syncer.sync();
@@ -52,6 +53,7 @@ public class RsyncMover {
             ((List<Emailer>) components.get(Emailer.class)).forEach(emailer -> emailer.send());
             final Audit audit = (Audit) components.get(Audit.class);
             audit.shutdown();
+            logger.info("Run completed, shutting down");
         }
     }
 
@@ -77,6 +79,8 @@ public class RsyncMover {
             components.putIfAbsent(MoverThread.class, moverThread);
             components.putIfAbsent(FileWatcher.class, fileWatchers);
             logger.info("File moving successfully initiated");
+        } else {
+            logger.warn("Not moving files as configured not to.");
         }
 
         if (config.downloadFiles()) {
@@ -85,6 +89,8 @@ public class RsyncMover {
             components.putIfAbsent(Sftp.class, sftps);
             components.putIfAbsent(Syncer.class, syncer);
             logger.info("File downloading successfully initiated");
+        } else {
+            logger.warn("Not downloading as configured not to.");
         }
 
         if (!config.isRunOnce()) {
@@ -159,7 +165,7 @@ public class RsyncMover {
     }
 
     private static MoverThread initMoverThread(final Config config, final Audit audit) {
-        return new MoverThread(config.getFilePermissions(), config.getDeleteDuplicateFiles(), audit);
+        return new MoverThread(config.getFilePermissions(), config.getFolderPermissions(), config.getUserPrincipal(), config.getDeleteDuplicateFiles(), audit);
     }
 
     @SuppressWarnings("unchecked")

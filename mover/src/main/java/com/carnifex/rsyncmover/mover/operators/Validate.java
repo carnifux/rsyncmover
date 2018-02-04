@@ -36,6 +36,7 @@ public class Validate extends MoveOperator implements StatefulOperator {
 
     @Override
     public Path operateStatefully(final Path from, final Path to, final List<Path> previousPaths) throws IOException {
+        logger.info("Validating " + to);
         // we want to compare the path we've been given to the one second to last in the list
         if (previousPaths.size() < 2) {
             return to;

@@ -14,6 +14,7 @@ import org.apache.logging.log4j.Logger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -27,17 +28,22 @@ public class MoverThread extends Thread {
     private final BlockingQueue<PathObject> pathObjectQueue;
     private final AtomicReference<PathObject> currentObject;
     private final Set<PosixFilePermission> filePermissions;
+    private final Set<PosixFilePermission> folderPermissions;
+    private final UserPrincipal user;
     private final boolean deleteDuplicateFiles;
     private final Audit audit;
     private volatile boolean shutdown;
     private volatile boolean shutdownImmediately;
     private volatile boolean moving;
 
-    public MoverThread(final Set<PosixFilePermission> filePermissions, final boolean deleteDuplicateFiles, final Audit audit) {
+    public MoverThread(final Set<PosixFilePermission> filePermissions, final Set<PosixFilePermission> folderPermissions,
+                       final UserPrincipal user, final boolean deleteDuplicateFiles, final Audit audit) {
         super("MoverThread");
         this.pathObjectQueue = new LinkedBlockingQueue<>();
         this.currentObject = new AtomicReference<>();
         this.filePermissions = filePermissions;
+        this.folderPermissions = folderPermissions;
+        this.user = user;
         this.deleteDuplicateFiles = deleteDuplicateFiles;
         this.shutdown = false;
         this.moving = false;
@@ -131,7 +137,7 @@ public class MoverThread extends Thread {
                 audit.add(new DuplicateEntry(pathObject.getTo().toAbsolutePath().toString()));
             }
             logger.info("Moving " + pathObject.getFrom() + " to " + pathObject.getTo() + " with operator " + pathObject.getOperator().getMethod());
-            final Path finalDir = pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions);
+            final Path finalDir = pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions, folderPermissions, user);
             logger.info("Move of " + pathObject.getFrom() + " finished; ended up at " + finalDir + ". " + pathObjectQueue.size() + " items remaining");
             audit.add(new MovedEntry(pathObject.getFrom().toAbsolutePath().toString(), finalDir.toAbsolutePath().toString(), pathObject.getOperator().getMethod()));
         } catch (Exception e) {

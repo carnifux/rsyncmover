@@ -31,6 +31,7 @@ public class Delete extends MoveOperator implements StatefulOperator {
     public Path operateStatefully(final Path from, final Path to, final List<Path> previousPaths) throws IOException {
         final Path path = previousPaths.get(indexToDelete);
         try {
+            logger.info("Deleting " + path);
             delete(path);
         } catch (IOException e) {
             final String msg = "Error deleting files; continuing";
