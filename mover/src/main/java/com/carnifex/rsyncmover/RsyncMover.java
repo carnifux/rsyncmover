@@ -33,8 +33,13 @@ public class RsyncMover {
     @SuppressWarnings("unchecked")
     public static void main(String[] args) {
         final String configPath = args != null && args.length > 0 ? args[0] : "config.xml";
-        final Config config = new Config(new ConfigLoader().load(configPath));
-        init(config);
+        final Config config = new Config(new ConfigLoader().load(Paths.get(configPath)));
+        try {
+            init(config);
+        } catch (Exception e) {
+            logger.error("", e);
+            System.exit(1);
+        }
         if (!config.isRunOnce()) {
             final ConfigWatcher configWatcher = new ConfigWatcher(configPath);
             components.put(ConfigWatcher.class, configWatcher);
@@ -154,10 +159,12 @@ public class RsyncMover {
         }
         // should contain audit, config watcher, and a list of shutdown hooks (thread)
         if (components.size() != 3 && !config.isRunOnce()) {
-            logger.fatal("Did not remove all components - shutdown not successful.");
-            logger.fatal("Remaining components: ");
-            components.keySet().forEach(key -> logger.fatal(key));
-            throw new RuntimeException();
+            if (components.size() != 2 || !components.keySet().equals(new HashSet<>(Arrays.asList(Audit.class, ConfigWatcher.class)))) {
+                logger.fatal("Did not remove all components - shutdown not successful.");
+                logger.fatal("Remaining components: ");
+                components.keySet().forEach(key -> logger.fatal(key));
+                throw new RuntimeException();
+            }
         }
         ((Set<Thread>) components.computeIfAbsent(Thread.class, ignore -> new HashSet<>()))
                 .forEach(thread -> Runtime.getRuntime().removeShutdownHook(thread));
@@ -173,14 +180,11 @@ public class RsyncMover {
         final List<FileWatcher> watchers = config.getWatchDir().stream().map(watch -> new FileWatcher(watch,
                 asSet(config.getPassivateLocation(), config.getAuditPassivateLocation()),
                 fileChangeWatcher, config.isLazyPolling(), audit)).collect(Collectors.toList());
-        final Thread hook = new Thread() {
-            @Override
-            public void run() {
-                // finish any pending moves before shutting down vm
-                watchers.forEach(FileWatcher::shutdown);
-                moverThread.shutdown(true);
-            }
-        };
+        final Thread hook = new Thread(() -> {
+            // finish any pending moves before shutting down vm
+            watchers.forEach(FileWatcher::shutdown);
+            moverThread.shutdown(true);
+        });
         ((Set<Thread>) components.computeIfAbsent(Thread.class, ignore -> new HashSet<>())).add(hook);
         return watchers;
     }
@@ -192,10 +196,8 @@ public class RsyncMover {
                 config.shouldDepassivateEachTime(), config.getMinimumFreeSpaceForDownload(), config.getFilePermissions(),
                 config.downloadsMustMatchMover(), movers, config.isLazyPolling(),
                 config.maxConcurrentDownloads(), config.isRunOnce(), (List<FileWatcher>) components.get(FileWatcher.class), audit);
-        final Thread hook = new Thread(() -> {
-            // finish any pending downloads before shutting down vm
-            syncer.shutdown();
-        });
+        // finish any pending downloads before shutting down vm
+        final Thread hook = new Thread(syncer::shutdown);
         Runtime.getRuntime().addShutdownHook(hook);
         ((Set<Thread>) components.computeIfAbsent(Thread.class, ignore -> new HashSet<>())).add(hook);
         return syncer;

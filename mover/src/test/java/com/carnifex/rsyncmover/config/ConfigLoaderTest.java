@@ -6,6 +6,9 @@ import com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URL;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,7 +20,9 @@ public class ConfigLoaderTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        config = new ConfigLoader().load(ClassLoader.getSystemResource("empty_config.xml").getPath().replaceAll("/\\w:", ""));
+        final URL systemResource = ClassLoader.getSystemResource("empty_config.xml");
+        final String config = new BufferedReader(new InputStreamReader(systemResource.openStream())).lines().collect(Collectors.joining());
+        ConfigLoaderTest.config = new ConfigLoader().load(config);
     }
 
     @Test

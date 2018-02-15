@@ -100,6 +100,8 @@ public class Mover {
             partialPaths = new ArrayList<>();
 
             resolvePath(directory);
+            // test the regexes
+            getPath("test.file");
         }
 
         public String getPath(final String filename) {

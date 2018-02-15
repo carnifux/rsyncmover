@@ -70,12 +70,20 @@ public class ConfigWatcher extends Thread {
                     continue;
                 }
                 if (configPath.endsWith(File.separator + ((WatchEvent<Path>) event).context().toString())) {
-                    logger.info("Config change detected, reinitialising");
                     final String newConfig = readConfig(Paths.get(configPath));
                     if (!newConfig.equals(previousConfig)) {
-                        previousConfig = newConfig;
-                        RsyncMover.reinit(configPath);
+                        logger.info("Config change detected, reinitialising");
+                        try {
+                            RsyncMover.reinit(newConfig);
+                            previousConfig = newConfig;
+                        } catch (Exception e) {
+                            logger.error("Exception loading invalid config", e);
+                            logger.error("Reloading previous valid config");
+                            RsyncMover.reinit(previousConfig);
+                        }
                     }
+                } else {
+                    logger.debug("Spurious config change detected, ignoring");
                 }
             }
 
