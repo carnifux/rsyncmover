@@ -100,7 +100,7 @@ public class Sftp {
                 executorService.submit(() -> {
                     try {
                         logger.info(server + ": Starting download of " + source + " (" + formatSize(getSize(sftp, source)) + ")");
-                        final NotificationEntry entry = new NotificationEntry("Starting download:\n" + file);
+                        final NotificationEntry entry = new NotificationEntry(this.getServerName() + "\nStarting download:\n" + file);
                         notifiers.forEach(notifier -> notifier.notify(entry));
                         sftp.get(source, target);
                         return null;
