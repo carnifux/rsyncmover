@@ -2,7 +2,9 @@ package com.carnifex.rsyncmover.mover.io;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.Entry;
 import com.carnifex.rsyncmover.mover.operators.MoveOperator;
+import com.carnifex.rsyncmover.notifications.Notifier;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -34,6 +36,7 @@ public class Mover {
     private final Target target;
     private final MoveOperator operator;
     private final int priority;
+    private List<Notifier> notifiers;
 
     public Mover(final com.carnifex.rsyncmover.beans.RsyncMover.Movers.Mover mover, final Audit audit) {
         this.name = mover.getName();
@@ -46,6 +49,9 @@ public class Mover {
         this.target = new Target(mover.getTargetDirectory());
         this.operator = MoveOperator.create(mover.getMoveOperators() != null ? mover.getMoveOperators().getMoveOperator() : Collections.emptyList(), audit);
         this.priority = mover.getPriority() != null ? mover.getPriority() : DEFAULT_PRIORITY;
+        this.notifiers = Boolean.TRUE.equals(mover.isNotify())
+                ? mover.getAgents().getAgent().stream().map(Notifier::find).collect(Collectors.toList())
+                : Collections.emptyList();
         logger.info("Mover for target directory " + target.partialPaths.stream().collect(Collectors.joining()) + " with move operation "
                 + operator.getMethod() + " successfully initialized");
     }
@@ -87,6 +93,10 @@ public class Mover {
 
     public int getPriority() {
         return priority;
+    }
+
+    public void notify(final Entry entry) {
+        notifiers.forEach(notifier -> notifier.notify(entry));
     }
 
     public static final class Target {

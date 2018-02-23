@@ -1,6 +1,8 @@
 package com.carnifex.rsyncmover.sync;
 
 
+import com.carnifex.rsyncmover.audit.entry.NotificationEntry;
+import com.carnifex.rsyncmover.notifications.Notifier;
 import com.google.common.util.concurrent.RateLimiter;
 import net.schmizz.sshj.SSHClient;
 import net.schmizz.sshj.common.StreamCopier.Listener;
@@ -38,10 +40,11 @@ public class Sftp {
     private final boolean isWindows;
     private final long maxDownloadSpeed;
     private final List<String> filesInQueue;
+    private final List<Notifier> notifiers;
 
     public Sftp(final String server, final int port, final String remoteDirectory, final String remoteRealDirectory,
                 final String user, final String pass, final String hostKey,
-                final Set<PosixFilePermission> filePermissions, final long maxDownloadSpeed) {
+                final Set<PosixFilePermission> filePermissions, final long maxDownloadSpeed, final List<Notifier> notifiers) {
         this.server = server;
         this.port = port;
         this.remoteDirectory = remoteDirectory;
@@ -54,6 +57,7 @@ public class Sftp {
         this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         this.maxDownloadSpeed = maxDownloadSpeed;
         this.filesInQueue = new ArrayList<>();
+        this.notifiers = notifiers;
         logger.info("Sftp client for server " + server + ":" + port + ", monitoring " + remoteDirectory + " successfully initialized");
     }
 
@@ -96,6 +100,8 @@ public class Sftp {
                 executorService.submit(() -> {
                     try {
                         logger.info(server + ": Starting download of " + source + " (" + formatSize(getSize(sftp, source)) + ")");
+                        final NotificationEntry entry = new NotificationEntry("Starting download:\n" + file);
+                        notifiers.forEach(notifier -> notifier.notify(entry));
                         sftp.get(source, target);
                         return null;
                     } catch (Exception e) {

@@ -2,6 +2,7 @@ package com.carnifex.rsyncmover.mover.io;
 
 import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import com.carnifex.rsyncmover.audit.entry.NotificationEntry;
 import com.carnifex.rsyncmover.sync.SyncedFiles;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -95,11 +96,14 @@ public class FileChangeWatcher extends Thread {
                         if (mover != null) {
                             final Path target = mover.getTarget(holder.get());
                             moverThread.submit(holder.get(), target, mover.getMoveOperator());
+                            mover.notify(new NotificationEntry(holder.get().getFileName().toString()));
                             syncedFiles.addDownloadedPath("file", holder.get().toString());
                             syncedFiles.finished();
                             dontReAdd.remove(holder.get());
                         } else {
-                            final String msg = "Found multiple movers for file " + holder.get().toString() + "; not moving";
+                            final String msg = "Found multiple movers (" +
+                                    movers.stream().map(Mover::getName).collect(Collectors.joining(", "))
+                                    + ") for file " + holder.get().toString() + "; not moving";
                             logger.error(msg);
                             audit.add(new ErrorEntry(msg));
                         }

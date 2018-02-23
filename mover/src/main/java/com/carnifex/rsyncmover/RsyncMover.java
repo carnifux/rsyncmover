@@ -2,6 +2,7 @@ package com.carnifex.rsyncmover;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.beans.RsyncMover.Notification.Agent;
 import com.carnifex.rsyncmover.config.Config;
 import com.carnifex.rsyncmover.config.ConfigLoader;
 import com.carnifex.rsyncmover.config.ConfigWatcher;
@@ -10,6 +11,7 @@ import com.carnifex.rsyncmover.mover.io.FileChangeWatcher;
 import com.carnifex.rsyncmover.mover.io.FileWatcher;
 import com.carnifex.rsyncmover.mover.io.Mover;
 import com.carnifex.rsyncmover.mover.io.MoverThread;
+import com.carnifex.rsyncmover.notifications.Notifier;
 import com.carnifex.rsyncmover.sync.Sftp;
 import com.carnifex.rsyncmover.sync.SyncedFiles;
 import com.carnifex.rsyncmover.sync.Syncer;
@@ -72,6 +74,7 @@ public class RsyncMover {
                 .map(time -> new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(), config.getEmail().getFrom(), time, audit))
                 .collect(Collectors.toList());
         components.putIfAbsent(Emailer.class, emailers);
+        config.getAgents().forEach(Notifier::create);
         final List<Mover> movers = config.getMovers().stream().map(m -> new Mover(m, audit)).collect(Collectors.toList());
 
         if (config.moveFiles()) {
@@ -80,6 +83,9 @@ public class RsyncMover {
             final SyncedFiles syncedFiles = new SyncedFiles(moverPassivateLocation != null ? Paths.get(moverPassivateLocation) : null);
             final FileChangeWatcher fileChangeWatcher = new FileChangeWatcher(movers, moverThread, syncedFiles, audit);
             final List<FileWatcher> fileWatchers = initFileWatchers(config, moverThread, fileChangeWatcher, audit);
+            if (fileWatchers.stream().noneMatch(FileWatcher::isActive)) {
+                throw new IllegalArgumentException("No file watchers were able to be initialised");
+            }
             components.putIfAbsent(FileChangeWatcher.class, fileChangeWatcher);
             components.putIfAbsent(MoverThread.class, moverThread);
             components.putIfAbsent(FileWatcher.class, fileWatchers);
@@ -106,6 +112,8 @@ public class RsyncMover {
             final Server server = new Server(config.getPort(), (Syncer) components.get(Syncer.class), movers, audit);
             components.putIfAbsent(Server.class, server);
         }
+
+
         currentConfig = config;
     }
 
@@ -113,9 +121,14 @@ public class RsyncMover {
         return config.getServers().stream()
             .flatMap(server -> server.getDirectories().stream()
                     .map(dir -> dir.getDirectory())
-                    .map(dir -> new Sftp(server.getHost(), server.getPort(),
-                            dir.getDirectory(), dir.getRealDirectory(), server.getUser(), server.getPass(),
-                            server.getHostKey(), config.getFilePermissions(), config.getMaxDownloadSpeedBytes())))
+                    .map(dir -> {
+                        // handle nulls
+                        final List<Notifier> notifiers = Boolean.TRUE.equals(server.isNotify()) ?
+                                server.getAgents().getAgent().stream().map(Notifier::find).collect(Collectors.toList()) : Collections.emptyList();
+                        return new Sftp(server.getHost(), server.getPort(),
+                                dir.getDirectory(), dir.getRealDirectory(), server.getUser(), server.getPass(),
+                                server.getHostKey(), config.getFilePermissions(), config.getMaxDownloadSpeedBytes(), notifiers);
+                    }))
             .collect(Collectors.toList());
     }
 
@@ -157,6 +170,7 @@ public class RsyncMover {
             final Audit audit = (Audit) components.get(Audit.class);
             audit.resetTransients();
         }
+        Notifier.shutdown();
         // should contain audit, config watcher, and a list of shutdown hooks (thread)
         if (components.size() != 3 && !config.isRunOnce()) {
             if (components.size() != 2 || !components.keySet().equals(new HashSet<>(Arrays.asList(Audit.class, ConfigWatcher.class)))) {

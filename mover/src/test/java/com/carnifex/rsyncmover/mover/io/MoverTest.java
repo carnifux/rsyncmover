@@ -64,6 +64,7 @@ public class MoverTest {
     public void getTarget_RegexMatch_NoMatch() throws Exception {
         final String simplePath = "/test";
         final Movers.Mover mover = new Movers.Mover();
+        mover.setNotify(false);
         mover.setPartialMatch(true);
         mover.setTargetDirectory("/dir/%(\\d)%1/%");
         assertEquals(Paths.get("/dir/test"), new Mover(mover, null).getTarget(Paths.get(simplePath)));

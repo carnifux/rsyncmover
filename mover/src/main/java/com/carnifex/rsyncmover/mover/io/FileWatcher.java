@@ -8,12 +8,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
+import java.nio.file.*;
 import java.util.Set;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
@@ -33,11 +28,19 @@ public class FileWatcher extends Thread {
     public FileWatcher(final String dir, final Set<String> dontWatch, final FileChangeWatcher fileChangeWatcher, final boolean lazyPolling, final Audit audit) {
         super("FileWatcher - " + dir);
         this.dir = Paths.get(dir);
+        if (!Files.exists(this.dir)) {
+            logger.warn("Attempting to create " + this.dir);
+            try {
+                Files.createDirectories(this.dir);
+            } catch (IOException e) {
+                logger.error("Error creating watch directory", e);
+            }
+        }
         this.dontWatch = dontWatch;
         this.fileChangeWatcher = fileChangeWatcher;
         this.audit = audit;
         this.lazyPolling = lazyPolling;
-        if (!this.dir.toFile().exists() || !this.dir.toFile().canRead()) {
+        if (!Files.exists(this.dir) || !Files.isWritable(this.dir)) {
             final String msg = "Watch folder " + dir + " does not exist or is unreadable, will not be watched";
             logger.error(msg);
             audit.add(new ErrorEntry(msg, null));
@@ -97,6 +100,10 @@ public class FileWatcher extends Thread {
                 break;
             }
         }
+    }
+
+    public boolean isActive() {
+        return watcher != null || lazyPolling;
     }
 
 

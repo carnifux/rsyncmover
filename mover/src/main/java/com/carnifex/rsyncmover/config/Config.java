@@ -173,6 +173,11 @@ public class Config {
                 : Stream.of(time.split(";")).map(eachTime -> LocalTime.parse(eachTime, TIME)).collect(Collectors.toList());
     }
 
+    public List<RsyncMover.Notification.Agent> getAgents() {
+        final RsyncMover.Notification notification = config.getNotification();
+        return notification != null ? notification.getAgent() : Collections.emptyList();
+    }
+
     public boolean runServer() {
         final Boolean webServer = config.getWebServer().isWebServer();
         return webServer == null ? getDefault(config.getWebServer(), "isWebServer", boolean.class) : webServer;

@@ -92,6 +92,9 @@ public class ConfigLoader {
             if (m.getDontMatchPatterns() == null) {
                 m.setDontMatchPatterns(new DontMatchPatterns());
             }
+            if (m.isNotify() == null) {
+                m.setNotify(false);
+            }
         }
         if (mover.getServers() == null) {
             mover.setServers(new RsyncMover.Servers());
@@ -105,8 +108,8 @@ public class ConfigLoader {
         if (mover.getAudit() == null) {
             mover.setAudit(new RsyncMover.Audit());
         }
-        if (mover.getMovers().isUseDefaultMatching()) {
-            updateMover(mover, loadBase());
+        if (mover.getNotification() == null) {
+            mover.setNotification(new RsyncMover.Notification());
         }
         for (final Mover m : mover.getMovers().getMover()) {
             if (m.getDontMatchMoverByName() != null && !m.getDontMatchMoverByName().getName().isEmpty()) {
@@ -130,6 +133,7 @@ public class ConfigLoader {
                 });
             }
         }
+        updateMover(mover, loadBase());
         return mover;
     }
 

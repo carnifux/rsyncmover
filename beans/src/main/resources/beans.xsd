@@ -98,6 +98,14 @@
                                 </xs:annotation>
                                 <xs:complexType>
                                     <xs:sequence>
+                                        <xs:element type="xs:boolean" name="notify" maxOccurs="1" minOccurs="0" default="false"/>
+                                        <xs:element name="agents" maxOccurs="1" minOccurs="0">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element type="xs:string" minOccurs="0" maxOccurs="unbounded" name="agent"/>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
                                         <xs:element type="xs:int" name="priority" minOccurs="0"
                                                     default="0"></xs:element>
                                         <xs:element type="xs:string" name="name" maxOccurs="1" minOccurs="0">
@@ -365,6 +373,14 @@
                                                 </xs:documentation>
                                             </xs:annotation>
                                         </xs:element>
+                                        <xs:element type="xs:boolean" name="notify" maxOccurs="1" minOccurs="0" default="false"/>
+                                        <xs:element name="agents" maxOccurs="1" minOccurs="0">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element type="xs:string" minOccurs="0" maxOccurs="unbounded" name="agent"/>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
                                     </xs:sequence>
                                 </xs:complexType>
                             </xs:element>
@@ -417,6 +433,34 @@
                         <xs:sequence>
                             <xs:element type="xs:boolean" name="webServer" maxOccurs="1" minOccurs="0"></xs:element>
                             <xs:element type="xs:int" name="port" maxOccurs="1" minOccurs="0"/>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="notification" maxOccurs="1" minOccurs="0">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element name="agent" minOccurs="0" maxOccurs="unbounded">
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element type="xs:string" name="type" minOccurs="1" maxOccurs="1"/>
+                                        <xs:element type="xs:boolean" name="enabled" minOccurs="1" maxOccurs="1"/>
+                                        <xs:element name="params" minOccurs="0" maxOccurs="1">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element name="param" minOccurs="0" maxOccurs="unbounded">
+                                                        <xs:complexType>
+                                                            <xs:sequence>
+                                                                <xs:element type="xs:string" name="key" minOccurs="1" maxOccurs="1"/>
+                                                                <xs:element type="xs:string" name="value" minOccurs="1" maxOccurs="1"/>
+                                                            </xs:sequence>
+                                                        </xs:complexType>
+                                                    </xs:element>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
                         </xs:sequence>
                     </xs:complexType>
                 </xs:element>
