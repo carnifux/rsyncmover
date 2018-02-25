@@ -88,6 +88,7 @@ public class FileChangeWatcher extends Thread {
                 if (holder.isReady()) {
                     final List<Mover> movers = this.movers.stream()
                             .filter(mover -> mover.shouldSubmit(holder.get()))
+                            .peek(mover -> logger.debug("Selected possible mover {} for file {}", mover.getName(), holder.get()))
                             .collect(Collectors.toList());
                     if (movers.size() == 0) {
                         logger.error("Unable to find mover for file " + holder.get().toString());

@@ -41,20 +41,16 @@ public class SyncedFiles {
                     logger.error("Could not create persist file " + persistLocation.toString()
                             + ", synced files will not function (duplicates will be downloaded)");
                     this.enabled = false;
-                    this.passive = false;
                 } else {
                     this.enabled = true;
-                    this.passive = true;
                 }
             } else {
                 this.enabled = true;
-                this.passive = true;
             }
         } else {
-            logger.error("No persist file provided, synced files will not function (duplicates will be downloaded)");
             this.enabled = false;
-            this.passive = false;
         }
+        this.passive = this.enabled;
 
     }
 

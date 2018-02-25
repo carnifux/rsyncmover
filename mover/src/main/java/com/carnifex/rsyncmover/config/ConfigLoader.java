@@ -133,7 +133,9 @@ public class ConfigLoader {
                 });
             }
         }
-        updateMover(mover, loadBase());
+        if (Boolean.TRUE.equals(mover.getMovers().isUseDefaultMatching())) {
+            updateMover(mover, loadBase());
+        }
         return mover;
     }
 

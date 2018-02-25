@@ -77,12 +77,30 @@ public class Mover {
         final String name = file.getName().toLowerCase();
         final boolean matchesPatterns = patterns.isEmpty()
                 || patterns.stream()
-                .map(pattern -> pattern.matcher(name))
-                .anyMatch(matcher -> partialMatch ? matcher.find() : matcher.matches());
+                .anyMatch(pattern -> {
+                    final Matcher matcher = pattern.matcher(name);
+                    final boolean matches = partialMatch ? matcher.find() : matcher.matches();
+                    final String msg = String.format("%s: %s matched filename %s against regex %s", this.getName(), matches ? "Positively" : "Negatively", name, pattern);
+                    if (matches) {
+                        logger.debug(msg);
+                    } else {
+                        logger.trace(msg);
+                    }
+                    return matches;
+                });
         final boolean doesntMatchNegativePatterns = negativePatterns.isEmpty()
                 || negativePatterns.stream()
-                .map(pattern -> pattern.matcher(name))
-                .noneMatch(matcher -> partialMatch ? matcher.find() : matcher.matches());
+                .noneMatch(pattern -> {
+                    final Matcher matcher = pattern.matcher(name);
+                    final boolean matches = partialMatch ? matcher.find() : matcher.matches();
+                    final String msg = String.format("%s: %s matched filename %s against negative regex %s", this.getName(), matches ? "Positively" : "Negatively", name, pattern);
+                    if (matches) {
+                        logger.trace(msg);
+                    } else {
+                        logger.debug(msg);
+                    }
+                    return matches;
+                });
         final boolean extensionsCorrect = extensions.isEmpty() || extensions.stream().anyMatch(name::endsWith);
         return matchesPatterns && extensionsCorrect && doesntMatchNegativePatterns;
     }
