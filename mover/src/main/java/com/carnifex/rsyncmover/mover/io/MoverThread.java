@@ -2,10 +2,11 @@ package com.carnifex.rsyncmover.mover.io;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.Type;
 import com.carnifex.rsyncmover.audit.entry.DuplicateEntry;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 import com.carnifex.rsyncmover.audit.entry.MovedEntry;
-import com.carnifex.rsyncmover.mover.Permissions;
+import com.carnifex.rsyncmover.audit.entry.NotificationEntry;
 import com.carnifex.rsyncmover.mover.operators.MoveOperator;
 import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
@@ -116,10 +117,10 @@ public class MoverThread extends Thread {
         this.interrupt();
     }
 
-    public void submit(final Path from, final Path to, final MoveOperator operator) {
+    public void submit(final Path from, final Path to, final Mover mover) {
         if (!shutdown) {
-            pathObjectQueue.add(new PathObject(from, to, operator));
-            logger.info(from.getFileName().toString() + " added to move queue with operator " + operator.getMethod()
+            pathObjectQueue.add(new PathObject(from, to, mover));
+            logger.info(from.getFileName().toString() + " added to move queue with operator " + mover.getMoveOperator().getMethod()
                     + "; queue now contains " + pathObjectQueue.size() + " items");
         }
     }
@@ -140,6 +141,7 @@ public class MoverThread extends Thread {
             final Path finalDir = pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions, folderPermissions, user);
             logger.info("Move of " + pathObject.getFrom() + " finished; ended up at " + finalDir + ". " + pathObjectQueue.size() + " items remaining");
             audit.add(new MovedEntry(pathObject.getFrom().toAbsolutePath().toString(), finalDir.toAbsolutePath().toString(), pathObject.getOperator().getMethod()));
+            pathObject.getMover().notify(new NotificationEntry(Type.MOVED, "Finished moving\n" + pathObject.getFrom()));
         } catch (Exception e) {
             final String s = pathObject.getOperator().getMethod() + ": Error moving from " + pathObject.getFrom().toString() + " to " + pathObject.getTo().toString();
             logger.error(s, e);
@@ -151,12 +153,12 @@ public class MoverThread extends Thread {
     private static final class PathObject {
         private final Path from;
         private final Path to;
-        private final MoveOperator operator;
+        private final Mover mover;
 
-        private PathObject(final Path from, final Path to, final MoveOperator operator) {
+        private PathObject(final Path from, final Path to, final Mover mover) {
             this.from = from;
             this.to = to;
-            this.operator = operator;
+            this.mover = mover;
         }
 
         private Path getFrom() {
@@ -168,8 +170,11 @@ public class MoverThread extends Thread {
         }
 
         private MoveOperator getOperator() {
-            return operator;
+            return mover.getMoveOperator();
         }
 
+        public Mover getMover() {
+            return mover;
+        }
     }
 }

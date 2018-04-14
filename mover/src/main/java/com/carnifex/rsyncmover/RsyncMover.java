@@ -2,7 +2,6 @@ package com.carnifex.rsyncmover;
 
 
 import com.carnifex.rsyncmover.audit.Audit;
-import com.carnifex.rsyncmover.beans.RsyncMover.Notification.Agent;
 import com.carnifex.rsyncmover.config.Config;
 import com.carnifex.rsyncmover.config.ConfigLoader;
 import com.carnifex.rsyncmover.config.ConfigWatcher;
@@ -142,24 +141,34 @@ public class RsyncMover {
     private static void shutdownAll(final Config config) {
         if (!config.isRunOnce()) {
             final List<Emailer> emailer = (List<Emailer>) components.remove(Emailer.class);
-            emailer.forEach(Thread::interrupt);
+            if (emailer != null) {
+                emailer.forEach(Thread::interrupt);
+            }
         }
         // shut down movers first so any current downloads arent moved with old movers
         if (components.containsKey(MoverThread.class)) {
             final MoverThread moverThread = (MoverThread) components.remove(MoverThread.class);
-            moverThread.shutdown(!config.isRunOnce());
+            if (moverThread != null) {
+                moverThread.shutdown(!config.isRunOnce());
+            }
             final List<FileWatcher> fileWatchers = (List<FileWatcher>) components.remove(FileWatcher.class);
-            fileWatchers.forEach(FileWatcher::shutdown);
+            if (fileWatchers != null) {
+                fileWatchers.forEach(FileWatcher::shutdown);
+            }
             final FileChangeWatcher fileChangeWatcher = (FileChangeWatcher) components.remove(FileChangeWatcher.class);
-            fileChangeWatcher.interrupt();
+            if (fileChangeWatcher != null) {
+                fileChangeWatcher.interrupt();
+            }
         }
         if (components.containsKey(Syncer.class)) {
             components.remove(Sftp.class);
             final Syncer syncer = (Syncer) components.remove(Syncer.class);
-            if (config.killDownloadOnExit()) {
-                syncer.forceShutdown();
+            if (syncer != null) {
+                if (config.killDownloadOnExit()) {
+                    syncer.forceShutdown();
+                }
+                syncer.shutdown();
             }
-            syncer.shutdown();
 
         }
         if (components.containsKey(Server.class)) {

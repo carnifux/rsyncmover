@@ -98,6 +98,17 @@
                                 </xs:annotation>
                                 <xs:complexType>
                                     <xs:sequence>
+                                        <xs:element name="subsonicScanner" maxOccurs="1" minOccurs="0">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element type="xs:boolean" name="enabled" default="false" maxOccurs="1" minOccurs="1"/>
+                                                    <xs:element type="xs:string" name="url" maxOccurs="1" minOccurs="1"/>
+                                                    <xs:element type="xs:string" name="username" maxOccurs="1" minOccurs="1"/>
+                                                    <xs:element type="xs:string" name="password" maxOccurs="1" minOccurs="1" />
+                                                    <xs:element type="xs:integer" name="minimumScanIntervalMinutes" maxOccurs="1" minOccurs="1"/>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
                                         <xs:element type="xs:boolean" name="notify" maxOccurs="1" minOccurs="0" default="false"/>
                                         <xs:element name="agents" maxOccurs="1" minOccurs="0">
                                             <xs:complexType>
@@ -442,6 +453,7 @@
                             <xs:element name="agent" minOccurs="0" maxOccurs="unbounded">
                                 <xs:complexType>
                                     <xs:sequence>
+                                        <xs:element type="xs:string" name="name" minOccurs="1" maxOccurs="1" />
                                         <xs:element type="xs:string" name="type" minOccurs="1" maxOccurs="1"/>
                                         <xs:element type="xs:boolean" name="enabled" minOccurs="1" maxOccurs="1"/>
                                         <xs:element name="params" minOccurs="0" maxOccurs="1">
@@ -455,6 +467,13 @@
                                                             </xs:sequence>
                                                         </xs:complexType>
                                                     </xs:element>
+                                                </xs:sequence>
+                                            </xs:complexType>
+                                        </xs:element>
+                                        <xs:element name="notifyOnTypes" maxOccurs="1" minOccurs="0">
+                                            <xs:complexType>
+                                                <xs:sequence>
+                                                    <xs:element name="type" type="xs:string" minOccurs="0" maxOccurs="unbounded" />
                                                 </xs:sequence>
                                             </xs:complexType>
                                         </xs:element>

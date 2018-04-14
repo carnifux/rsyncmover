@@ -1,6 +1,7 @@
 package com.carnifex.rsyncmover.sync;
 
 
+import com.carnifex.rsyncmover.audit.Type;
 import com.carnifex.rsyncmover.audit.entry.NotificationEntry;
 import com.carnifex.rsyncmover.notifications.Notifier;
 import com.google.common.util.concurrent.RateLimiter;
@@ -100,7 +101,7 @@ public class Sftp {
                 executorService.submit(() -> {
                     try {
                         logger.info(server + ": Starting download of " + source + " (" + formatSize(getSize(sftp, source)) + ")");
-                        final NotificationEntry entry = new NotificationEntry(this.getServerName() + "\nStarting download:\n" + file);
+                        final NotificationEntry entry = new NotificationEntry(Type.SEEN, this.getServerName() + "\nStarting download:\n" + file);
                         notifiers.forEach(notifier -> notifier.notify(entry));
                         sftp.get(source, target);
                         return null;

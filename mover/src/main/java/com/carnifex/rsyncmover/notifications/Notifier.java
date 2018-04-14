@@ -1,12 +1,15 @@
 package com.carnifex.rsyncmover.notifications;
 
 
+import com.carnifex.rsyncmover.audit.Type;
 import com.carnifex.rsyncmover.audit.entry.Entry;
-import com.carnifex.rsyncmover.beans.RsyncMover;
+import com.carnifex.rsyncmover.beans.RsyncMover.Notification.Agent;
+import com.carnifex.rsyncmover.beans.RsyncMover.Notification.Agent.Params.Param;
 import com.carnifex.rsyncmover.notifications.impl.Pushbullet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,22 +21,41 @@ public abstract class Notifier {
 
     private static final Map<String, Notifier> cachedNotifiers = new ConcurrentHashMap<>();
 
-    public abstract void notify(final Entry entry);
+    private final List<Type> supportedTypes;
 
-    public static Notifier create(final RsyncMover.Notification.Agent agent) {
+    protected Notifier(final List<Type> supportedTypes) {
+        this.supportedTypes = supportedTypes;
+    }
+
+    protected abstract void notifyInternal(final Entry entry);
+
+    public void notify(final Entry entry) {
+        if (supportedTypes.contains(entry.getType())) {
+            notifyInternal(entry);
+        }
+    }
+
+    public static Notifier create(final Agent agent) {
         if (!agent.isEnabled()) {
             return null;
         }
+        final List<Type> types;
+        if (agent.getNotifyOnTypes() != null && !agent.getNotifyOnTypes().getType().isEmpty()) {
+            types = agent.getNotifyOnTypes().getType().stream().map(Type::valueOf).collect(Collectors.toList());
+        } else {
+            types = Arrays.asList(Type.values());
+        }
         switch (agent.getType()) {
             case "pushbullet": {
-                return cachedNotifiers.computeIfAbsent(agent.getType(), type -> {
-                    final List<RsyncMover.Notification.Agent.Params.Param> params = agent.getParams().getParam();
-                    final List<RsyncMover.Notification.Agent.Params.Param> apiKey = params.stream()
+                return cachedNotifiers.computeIfAbsent(agent.getName(), type -> {
+                    final List<Param> params = agent.getParams().getParam();
+                    final List<Param> apiKey = params.stream()
                             .filter(param -> param.getKey().equals("apiKey"))
                             .collect(Collectors.toList());
                     if (apiKey.size() == 1) {
-                        logger.info("Created notifier of class " + Pushbullet.class + " for declared type '" + agent.getType() + "'");
-                        return new Pushbullet(apiKey.get(0).getValue());
+                        logger.info("Created notifier of class " + Pushbullet.class + " for declared type '" + agent.getType() + "', " +
+                                "notifying on types " + types.stream().map(Type::name).collect(Collectors.joining(", ")));
+                        return new Pushbullet(types, apiKey.get(0).getValue());
                     }
                     throw new IllegalArgumentException("Unable to create Pushbullet notifier from " + agent.toString());
                 });

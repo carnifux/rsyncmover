@@ -8,8 +8,8 @@ public class NotificationEntry extends Entry {
 
     private final String path;
 
-    public NotificationEntry(final String message) {
-        super(Type.MOVED);
+    public NotificationEntry(final Type type, final String message) {
+        super(type);
         this.path = message;
     }
 
