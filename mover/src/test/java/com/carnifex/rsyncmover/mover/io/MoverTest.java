@@ -1,7 +1,10 @@
 package com.carnifex.rsyncmover.mover.io;
 
+import com.carnifex.rsyncmover.Utilities;
 import com.carnifex.rsyncmover.beans.RsyncMover.Movers;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Paths;
 import java.time.LocalDate;
@@ -11,6 +14,8 @@ import static org.junit.Assert.assertEquals;
 
 
 public class MoverTest {
+
+    private static final Logger logger = LoggerFactory.getLogger(MoverTest.class);
 
 
     @Test
@@ -24,6 +29,10 @@ public class MoverTest {
 
     @Test
     public void getTarget_Windows() throws Exception {
+        if (!Utilities.isRunningOnWindows()) {
+            logger.warn("Not running on windows, skipping test");
+            return;
+        }
         final String simplePath = "/test";
         final Movers.Mover mover = new Movers.Mover();
         mover.setPartialMatch(true);

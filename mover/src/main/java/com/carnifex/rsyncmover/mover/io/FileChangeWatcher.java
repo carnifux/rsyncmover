@@ -1,5 +1,6 @@
 package com.carnifex.rsyncmover.mover.io;
 
+import com.carnifex.rsyncmover.Utilities;
 import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.audit.Type;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
@@ -41,7 +42,7 @@ public class FileChangeWatcher extends Thread {
         super("FileChangeWatcher");
         this.filesToMoveSoon = ConcurrentHashMap.newKeySet();
         this.dontReAdd = ConcurrentHashMap.newKeySet();
-        this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        this.isWindows = Utilities.isRunningOnWindows();
         this.movers = movers;
         this.moverThread = moverThread;
         this.syncedFiles = syncedFiles;

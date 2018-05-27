@@ -1,6 +1,7 @@
 package com.carnifex.rsyncmover.mover.operators;
 
 
+import com.carnifex.rsyncmover.Utilities;
 import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.beans.RsyncMover;
 import com.carnifex.rsyncmover.mover.Permissions;
@@ -44,7 +45,7 @@ public abstract class MoveOperator {
 
     protected MoveOperator(final Audit audit, final List<String> additionalArguments) {
         this.audit = audit;
-        this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        this.isWindows = Utilities.isRunningOnWindows();
     }
 
     public Path move(final Path from, final Path to, final Set<PosixFilePermission> filePermissions, final Set<PosixFilePermission> folderPermissions, final UserPrincipal userPrincipal) throws IOException {

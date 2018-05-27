@@ -1,6 +1,7 @@
 package com.carnifex.rsyncmover.sync;
 
 
+import com.carnifex.rsyncmover.Utilities;
 import com.carnifex.rsyncmover.audit.Type;
 import com.carnifex.rsyncmover.audit.entry.NotificationEntry;
 import com.carnifex.rsyncmover.notifications.Notifier;
@@ -17,13 +18,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.LongStream;
 
 public class Sftp {
 
@@ -55,7 +56,7 @@ public class Sftp {
         this.hostKey = hostKey;
         this.filePermissions = filePermissions;
         this.watcher = new DownloadWatcher(server, maxDownloadSpeed);
-        this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        this.isWindows = Utilities.isRunningOnWindows();
         this.maxDownloadSpeed = maxDownloadSpeed;
         this.filesInQueue = new ArrayList<>();
         this.notifiers = notifiers;

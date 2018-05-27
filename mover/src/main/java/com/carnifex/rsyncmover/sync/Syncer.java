@@ -1,6 +1,7 @@
 package com.carnifex.rsyncmover.sync;
 
 
+import com.carnifex.rsyncmover.Utilities;
 import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.audit.entry.DownloadedEntry;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
@@ -20,7 +21,10 @@ import java.text.Normalizer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -81,7 +85,7 @@ public class Syncer extends Thread {
         this.running = true;
         this.sleeping = false;
         this.syncing = false;
-        this.isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        this.isWindows = Utilities.isRunningOnWindows();
         if (!runOnce) {
             this.start();
         }
