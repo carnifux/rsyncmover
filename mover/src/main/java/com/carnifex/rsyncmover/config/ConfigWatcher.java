@@ -33,7 +33,7 @@ public class ConfigWatcher extends Thread {
         }
         try {
             this.watcher = FileSystems.getDefault().newWatchService();
-            config.getParent().register(watcher, ENTRY_MODIFY, ENTRY_CREATE);
+            config.toAbsolutePath().getParent().register(watcher, ENTRY_MODIFY, ENTRY_CREATE);
             this.start();
             logger.info("Config watcher initialised");
         } catch (IOException e) {

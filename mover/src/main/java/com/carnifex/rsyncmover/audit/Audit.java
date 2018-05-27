@@ -144,7 +144,7 @@ public class Audit extends Thread {
                 out.writeObject(map);
                 allEntries.clear();
                 logger.debug("Audit persisted - " + entriesAdded + " entries added to persisted location");
-            } catch (IOException e) {
+            } catch (Exception e) {
                 final String msg = "Exception writing persisted entries";
                 logger.error(msg, e);
                 add(new ErrorEntry(msg, e));
@@ -182,7 +182,7 @@ public class Audit extends Thread {
                 final Map<Type, Set<Entry>> fromFile = (Map<Type, Set<Entry>>) in.readObject();
                 map.putAll(fromFile);
                 persisted = false;
-                logger.debug("Read " + (int) allEntries.values().stream().flatMap(Collection::stream).count() + " persisted entries");
+                logger.debug("Read " + (int) allEntries.values().stream().mapToLong(Collection::size).sum() + " persisted entries");
             } catch (InvalidClassException e) {
                 final String msg = "Invalid class detected deserializing - deleting audit. Sorry :(";
                 logger.error(msg, e);
@@ -196,7 +196,7 @@ public class Audit extends Thread {
                     logger.error(message, e1);
                     add(new ErrorEntry(message, e1));
                 }
-            } catch (IOException | ClassNotFoundException e) {
+            } catch (Exception e) {
                 final String msg = "Exception reading persisted entries";
                 logger.error(msg, e);
                 add(new ErrorEntry(msg, e));
