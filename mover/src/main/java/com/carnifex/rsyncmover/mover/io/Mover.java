@@ -49,7 +49,7 @@ public class Mover {
         this.target = new Target(mover.getTargetDirectory());
         this.operator = MoveOperator.create(mover.getMoveOperators() != null ? mover.getMoveOperators().getMoveOperator() : Collections.emptyList(), audit);
         this.priority = mover.getPriority() != null ? mover.getPriority() : DEFAULT_PRIORITY;
-        this.notifiers = Boolean.TRUE.equals(mover.isNotify())
+        this.notifiers = Boolean.TRUE.equals(mover.isNotify()) && mover.getAgents() != null
                 ? mover.getAgents().getAgent().stream().map(Notifier::find).collect(Collectors.toList())
                 : Collections.emptyList();
         logger.info("Mover for target directory " + target.partialPaths.stream().collect(Collectors.joining()) + " with move operation "
