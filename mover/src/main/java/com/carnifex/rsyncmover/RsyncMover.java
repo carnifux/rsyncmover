@@ -95,7 +95,8 @@ public class RsyncMover {
 
         if (config.downloadFiles()) {
             final List<Sftp> sftps = initSshs(config);
-            final Syncer syncer = initSyncer(config, movers, sftps, audit);
+            final MoverThread moverThread = config.moveFiles() ? (MoverThread) components.get(MoverThread.class) : null;
+            final Syncer syncer = initSyncer(config, movers, sftps, moverThread, audit);
             components.putIfAbsent(Sftp.class, sftps);
             components.putIfAbsent(Syncer.class, syncer);
             logger.info("File downloading successfully initiated");
@@ -213,12 +214,14 @@ public class RsyncMover {
     }
 
     @SuppressWarnings("unchecked")
-    private static Syncer initSyncer(final Config config, final List<Mover> movers, final List<Sftp> sftps, final Audit audit) {
+    private static Syncer initSyncer(final Config config, final List<Mover> movers, final List<Sftp> sftps,
+                                     final MoverThread moverThread, final Audit audit) {
         final SyncedFiles syncedFiles = new SyncedFiles(Paths.get(config.getPassivateLocation()));
         final Syncer syncer = new Syncer(config.getWatchDir(), sftps, syncedFiles, config.getSyncFrequency(),
                 config.shouldDepassivateEachTime(), config.getMinimumFreeSpaceForDownload(), config.getFilePermissions(),
                 config.downloadsMustMatchMover(), movers, config.isLazyPolling(),
-                config.maxConcurrentDownloads(), config.isRunOnce(), (List<FileWatcher>) components.get(FileWatcher.class), audit);
+                config.maxConcurrentDownloads(), config.isRunOnce(), (List<FileWatcher>) components.get(FileWatcher.class),
+                moverThread, audit);
         // finish any pending downloads before shutting down vm
         final Thread hook = new Thread(syncer::shutdown);
         Runtime.getRuntime().addShutdownHook(hook);

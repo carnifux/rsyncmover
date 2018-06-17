@@ -8,6 +8,7 @@ import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 import com.carnifex.rsyncmover.audit.entry.SeenEntry;
 import com.carnifex.rsyncmover.mover.io.FileWatcher;
 import com.carnifex.rsyncmover.mover.io.Mover;
+import com.carnifex.rsyncmover.mover.io.MoverThread;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -45,6 +46,7 @@ public class Syncer extends Thread {
     private final Set<PosixFilePermission> filePermissions;
     private final boolean lazyPolling;
     private final List<FileWatcher> fileWatchers;
+    private final MoverThread moverThread;
     private final Audit audit;
     private final ExecutorService executorService;
     private final boolean isWindows;
@@ -52,7 +54,7 @@ public class Syncer extends Thread {
     public Syncer(final List<String> dlDirs, final List<Sftp> sftps, final SyncedFiles syncedFiles, final int syncFrequency,
                   final boolean passivateEachTime, final long minimumSpace, final Set<PosixFilePermission> filePermissions,
                   final boolean downloadsMustMatchMover, final List<Mover> movers, final boolean lazyPolling, final int maxConcurrentDownloads,
-                  final boolean runOnce, final List<FileWatcher> fileWatchers, final Audit audit) {
+                  final boolean runOnce, final List<FileWatcher> fileWatchers, final MoverThread moverThread, final Audit audit) {
         super("Syncer");
         this.dlDirs = dlDirs;
         dlDirs.forEach(dir -> {
@@ -76,6 +78,7 @@ public class Syncer extends Thread {
         this.filePermissions = filePermissions;
         this.lazyPolling = lazyPolling;
         this.fileWatchers = fileWatchers != null ? fileWatchers : Collections.emptyList();
+        this.moverThread = moverThread;
         final AtomicInteger threadIndex = new AtomicInteger(0);
         this.executorService = new ThreadPoolExecutor(maxConcurrentDownloads, maxConcurrentDownloads,
                 0L, TimeUnit.MILLISECONDS,
@@ -134,6 +137,7 @@ public class Syncer extends Thread {
                                 }
                                 syncedFiles.addDownloadedPath(sftp.getServerName(), normalize(path));
                                 audit.add(new DownloadedEntry(path, sftp.getServerName()));
+
                             }, executorService);
                             logger.info("Finished downloading " + fileToDownload + " in " + (System.currentTimeMillis() - start) / 1000 + "ms");
                         } catch (Exception e) {

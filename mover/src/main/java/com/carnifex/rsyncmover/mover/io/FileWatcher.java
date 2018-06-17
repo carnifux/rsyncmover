@@ -88,7 +88,7 @@ public class FileWatcher extends Thread {
 
                 final Path absolutePath = toAbsolute(filename);
                 if (!dontWatch.contains(absolutePath.toString())) {
-                    fileChangeWatcher.submit(absolutePath);
+                    fileChangeWatcher.submit(absolutePath, false);
                 }
             }
 
@@ -128,7 +128,7 @@ public class FileWatcher extends Thread {
         if (files != null && files.length > 0) {
             logger.info("Submitting existing initial files in " + dir);
             for (final File file : files) {
-                fileChangeWatcher.submit(file.toPath());
+                fileChangeWatcher.submit(file.toPath(), false);
             }
         }
     }

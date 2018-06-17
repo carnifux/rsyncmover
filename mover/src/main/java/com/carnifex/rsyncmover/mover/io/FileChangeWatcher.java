@@ -65,7 +65,7 @@ public class FileChangeWatcher extends Thread {
         }
     }
 
-    public void submit(final Path path) {
+    public void submit(final Path path, final boolean moveImmediately) {
         if (shutdown) {
             return;
         }
@@ -79,8 +79,12 @@ public class FileChangeWatcher extends Thread {
             logger.info("Not re-moving file we've already moved: " + path.toString());
             return;
         }
+        if (moveImmediately) {
+            logger.info("Immediately moving " + path.toString());
+            filesToMoveSoon.add(new PathHolder(path, true));
+        }
         logger.info("Registering " + path.toString());
-        filesToMoveSoon.add(new PathHolder(path));
+        filesToMoveSoon.add(new PathHolder(path, false));
     }
 
     private void checkFilesToMove() {
@@ -159,14 +163,16 @@ public class FileChangeWatcher extends Thread {
         private long lastModified;
         private long lastPolled;
         private final Set<PathHolder> subDirectories;
+        private final boolean isAlwaysReady;
 
-        public PathHolder(final Path path) {
+        PathHolder(final Path path, final boolean isAlwaysReady) {
             this.path = path;
             this.file = path.toFile();
             this.lastSize = file.length();
             this.lastModified = file.lastModified();
             this.lastPolled = System.currentTimeMillis();
-            this.subDirectories = getSubFiles();
+            this.isAlwaysReady = isAlwaysReady;
+            this.subDirectories = this.isAlwaysReady ? Collections.emptySet() : getSubFiles();
         }
 
         private Set<PathHolder> getSubFiles() {
@@ -174,13 +180,16 @@ public class FileChangeWatcher extends Thread {
                 final File[] files = file.listFiles();
                 if (files != null) {
                     return Stream.of(files).map(f -> Paths.get(f.toURI()))
-                            .map(PathHolder::new).collect(Collectors.toSet());
+                            .map(p -> new PathHolder(p, false)).collect(Collectors.toSet());
                 }
             }
             return Collections.emptySet();
         }
 
         public boolean isReady() {
+            if (isAlwaysReady) {
+                return true;
+            }
             // check that no new files have been added
             if (file.isDirectory()) {
                 subDirectories.addAll(getSubFiles());
