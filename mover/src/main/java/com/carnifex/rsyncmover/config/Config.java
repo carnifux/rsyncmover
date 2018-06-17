@@ -69,6 +69,9 @@ public class Config {
     }
 
     public UserPrincipal getUserPrincipal() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return null;
+        }
         final String user = config.getMovers().getMovedFileUser();
         if (user != null) {
             try {
