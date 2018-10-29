@@ -1,6 +1,20 @@
 package com.carnifex.rsyncmover;
 
 
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.config.Config;
 import com.carnifex.rsyncmover.config.ConfigLoader;
@@ -18,19 +32,12 @@ import com.carnifex.rsyncmover.web.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 public class RsyncMover {
 
     private static final Logger logger = LogManager.getLogger();
     private static final Map<Class<?>, Object> components = new ConcurrentHashMap<>();
     private static Config currentConfig;
 
-    // TODO i should just use spring
     @SuppressWarnings("unchecked")
     public static void main(String[] args) {
         final String configPath = args != null && args.length > 0 ? args[0] : "config.xml";
@@ -76,8 +83,10 @@ public class RsyncMover {
         config.getAgents().forEach(Notifier::create);
         final List<Mover> movers = config.getMovers().stream().map(m -> new Mover(m, audit)).collect(Collectors.toList());
 
+        final Lock simultaneousLock = config.isAllowSimultaneousTasks() ? null : new ReentrantLock();
+
         if (config.moveFiles()) {
-            final MoverThread moverThread = initMoverThread(config, audit);
+            final MoverThread moverThread = initMoverThread(config, simultaneousLock, audit);
             final String moverPassivateLocation = config.getMoverPassivateLocation();
             final SyncedFiles syncedFiles = new SyncedFiles(moverPassivateLocation != null ? Paths.get(moverPassivateLocation) : null);
             final FileChangeWatcher fileChangeWatcher = new FileChangeWatcher(movers, moverThread, syncedFiles, audit);
@@ -94,7 +103,7 @@ public class RsyncMover {
         }
 
         if (config.downloadFiles()) {
-            final List<Sftp> sftps = initSshs(config);
+            final List<Sftp> sftps = initSshs(config, simultaneousLock);
             final MoverThread moverThread = config.moveFiles() ? (MoverThread) components.get(MoverThread.class) : null;
             final Syncer syncer = initSyncer(config, movers, sftps, moverThread, audit);
             components.putIfAbsent(Sftp.class, sftps);
@@ -117,7 +126,7 @@ public class RsyncMover {
         currentConfig = config;
     }
 
-    private static List<Sftp> initSshs(final Config config) {
+    private static List<Sftp> initSshs(final Config config, final Lock simultaneousLock) {
         return config.getServers().stream()
             .flatMap(server -> server.getDirectories().stream()
                     .map(dir -> dir.getDirectory())
@@ -127,7 +136,8 @@ public class RsyncMover {
                                 server.getAgents().getAgent().stream().map(Notifier::find).collect(Collectors.toList()) : Collections.emptyList();
                         return new Sftp(server.getHost(), server.getPort(),
                                 dir.getDirectory(), dir.getRealDirectory(), server.getUser(), server.getPass(),
-                                server.getHostKey(), config.getFilePermissions(), config.getMaxDownloadSpeedBytes(), notifiers);
+                                server.getHostKey(), config.getFilePermissions(), config.getMaxDownloadSpeedBytes(), notifiers,
+                                simultaneousLock);
                     }))
             .collect(Collectors.toList());
     }
@@ -195,8 +205,9 @@ public class RsyncMover {
         components.remove(Thread.class);
     }
 
-    private static MoverThread initMoverThread(final Config config, final Audit audit) {
-        return new MoverThread(config.getFilePermissions(), config.getFolderPermissions(), config.getUserPrincipal(), config.getDeleteDuplicateFiles(), audit);
+    private static MoverThread initMoverThread(final Config config, final Lock simultaneousLock, final Audit audit) {
+        return new MoverThread(config.getFilePermissions(), config.getFolderPermissions(), config.getUserPrincipal(), config.getDeleteDuplicateFiles(),
+                simultaneousLock, audit);
     }
 
     @SuppressWarnings("unchecked")

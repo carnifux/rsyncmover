@@ -1,6 +1,19 @@
 package com.carnifex.rsyncmover.sync;
 
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.locks.Lock;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
 import com.carnifex.rsyncmover.Utilities;
 import com.carnifex.rsyncmover.audit.Type;
 import com.carnifex.rsyncmover.audit.entry.NotificationEntry;
@@ -13,18 +26,6 @@ import net.schmizz.sshj.sftp.SFTPClient;
 import net.schmizz.sshj.xfer.TransferListener;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.attribute.PosixFilePermission;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 public class Sftp {
 
@@ -43,10 +44,12 @@ public class Sftp {
     private final long maxDownloadSpeed;
     private final List<String> filesInQueue;
     private final List<Notifier> notifiers;
+    private final Lock simultaneousLock;
 
     public Sftp(final String server, final int port, final String remoteDirectory, final String remoteRealDirectory,
                 final String user, final String pass, final String hostKey,
-                final Set<PosixFilePermission> filePermissions, final long maxDownloadSpeed, final List<Notifier> notifiers) {
+                final Set<PosixFilePermission> filePermissions, final long maxDownloadSpeed, final List<Notifier> notifiers,
+                final Lock simultaneousLock) {
         this.server = server;
         this.port = port;
         this.remoteDirectory = remoteDirectory;
@@ -60,6 +63,7 @@ public class Sftp {
         this.maxDownloadSpeed = maxDownloadSpeed;
         this.filesInQueue = new ArrayList<>();
         this.notifiers = notifiers;
+        this.simultaneousLock = simultaneousLock;
         logger.info("Sftp client for server " + server + ":" + port + ", monitoring " + remoteDirectory + " successfully initialized");
     }
 
@@ -100,6 +104,9 @@ public class Sftp {
                 final String file = files.get(i);
                 final String source = remoteDirectory + file;
                 executorService.submit(() -> {
+                    if (simultaneousLock != null) {
+                        simultaneousLock.lock();
+                    }
                     try {
                         logger.info(server + ": Starting download of " + source + " (" + formatSize(getSize(sftp, source)) + ")");
                         final NotificationEntry entry = new NotificationEntry(Type.SEEN, this.getServerName() + "\nStarting download:\n" + file);
@@ -123,6 +130,9 @@ public class Sftp {
                     } finally {
                         filesInQueue.remove(file);
                         watcher.finished();
+                        if (simultaneousLock != null) {
+                            simultaneousLock.unlock();
+                        }
                     }
                 }).get();
                 callback.accept(file);

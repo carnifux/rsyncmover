@@ -4,6 +4,7 @@
         <xs:complexType>
             <xs:sequence>
                 <xs:element name="runOnce" maxOccurs="1" minOccurs="0" default="false" type="xs:boolean"/>
+                <xs:element name="allowSimultaneousTasks" maxOccurs="1" minOccurs="0" default="true" type="xs:boolean" />
                 <xs:element name="watches">
                     <xs:complexType>
                         <xs:sequence>

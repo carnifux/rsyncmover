@@ -1,6 +1,17 @@
 package com.carnifex.rsyncmover.mover.io;
 
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+
 import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.audit.Type;
 import com.carnifex.rsyncmover.audit.entry.DuplicateEntry;
@@ -12,16 +23,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.UserPrincipal;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
 public class MoverThread extends Thread {
 
     private static final Logger logger = LogManager.getLogger();
@@ -32,13 +33,15 @@ public class MoverThread extends Thread {
     private final Set<PosixFilePermission> folderPermissions;
     private final UserPrincipal user;
     private final boolean deleteDuplicateFiles;
+    private final Lock simultaneousLock;
     private final Audit audit;
     private volatile boolean shutdown;
     private volatile boolean shutdownImmediately;
     private volatile boolean moving;
 
     public MoverThread(final Set<PosixFilePermission> filePermissions, final Set<PosixFilePermission> folderPermissions,
-                       final UserPrincipal user, final boolean deleteDuplicateFiles, final Audit audit) {
+                       final UserPrincipal user, final boolean deleteDuplicateFiles, final Lock simultaneousLock,
+                       final Audit audit) {
         super("MoverThread");
         this.pathObjectQueue = new LinkedBlockingQueue<>();
         this.currentObject = new AtomicReference<>();
@@ -48,6 +51,7 @@ public class MoverThread extends Thread {
         this.deleteDuplicateFiles = deleteDuplicateFiles;
         this.shutdown = false;
         this.moving = false;
+        this.simultaneousLock = simultaneousLock;
         this.audit = audit;
         audit.addMoverThread(this);
         this.start();
@@ -127,6 +131,9 @@ public class MoverThread extends Thread {
 
     private void move(final PathObject pathObject) {
         try {
+            if (simultaneousLock != null) {
+                simultaneousLock.lock();
+            }
             if (deleteDuplicateFiles && pathObject.getTo().toFile().exists()
                     && Files.size(pathObject.getFrom()) < Files.size(pathObject.getTo())) {
                 logger.warn("Deleting duplicate files - " + pathObject.getFrom() + " to " + pathObject.getTo());
@@ -146,6 +153,10 @@ public class MoverThread extends Thread {
             final String s = pathObject.getOperator().getMethod() + ": Error moving from " + pathObject.getFrom().toString() + " to " + pathObject.getTo().toString();
             logger.error(s, e);
             audit.add(new ErrorEntry(s, e));
+        } finally {
+            if (simultaneousLock != null) {
+                simultaneousLock.unlock();
+            }
         }
     }
 

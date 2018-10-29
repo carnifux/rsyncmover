@@ -1,18 +1,9 @@
 package com.carnifex.rsyncmover.audit;
 
-import com.carnifex.rsyncmover.audit.entry.Entry;
-import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
-import com.carnifex.rsyncmover.mover.io.MoverThread;
-import com.carnifex.rsyncmover.sync.Sftp;
-import com.carnifex.rsyncmover.sync.Sftp.DownloadWatcher;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InvalidClassException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -22,37 +13,67 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-import static com.carnifex.rsyncmover.audit.Type.DOWNLOADED;
-import static com.carnifex.rsyncmover.audit.Type.DUPLICATE;
-import static com.carnifex.rsyncmover.audit.Type.ERROR;
-import static com.carnifex.rsyncmover.audit.Type.MOVED;
-import static com.carnifex.rsyncmover.audit.Type.SEEN;
+import com.carnifex.rsyncmover.audit.entry.Entry;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import com.carnifex.rsyncmover.inject.Bean;
+import com.carnifex.rsyncmover.inject.Inject;
+import com.carnifex.rsyncmover.mover.io.MoverThread;
+import com.carnifex.rsyncmover.sync.Sftp;
+import com.carnifex.rsyncmover.sync.Sftp.DownloadWatcher;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 
-public class Audit extends Thread {
+public class Audit extends Thread implements Bean  {
 
     private static final List<Type> types = Arrays.asList(Type.values());
     private static final long persistInterval = 5 * 1000 * 60; // 5 minutes
     private static final Logger logger = LogManager.getLogger();
-    private final Map<Type, Set<Entry>> allEntries;
-    private final Map<Type, Set<Entry>> dailyEntries;
-    private final Lock lock;
-    private final LocalDateTime startTime;
-    private final boolean persist;
-    private final String persistLocation;
+    private Map<Type, Set<Entry>> allEntries;
+    private Map<Type, Set<Entry>> dailyEntries;
+    private Lock lock;
+    private LocalDateTime startTime;
+    private boolean persist;
+    private String persistLocation;
     private volatile boolean locked;
     private volatile long nextPersist;
     private volatile boolean needToPersist;
     private volatile boolean persisted;
-    private final transient List<DownloadWatcher> downloadWatchers;
-    private final transient List<Sftp> sftps;
-    private final transient List<MoverThread> moverThreads;
+    @Inject
+    private transient List<DownloadWatcher> downloadWatchers;
+    @Inject
+    private transient List<Sftp> sftps;
+    @Inject
+    private transient List<MoverThread> moverThreads;
+
+    @Override
+    public boolean shouldBeRecreated() {
+        return false;
+    }
+
+    @Override
+    public boolean isSingleton() {
+        return true;
+    }
+
+    @Override
+    public void initialise() {
+
+    }
 
     public Audit(final boolean persist, final String persistLocation, final Audit old) {
         super("AuditThread");
