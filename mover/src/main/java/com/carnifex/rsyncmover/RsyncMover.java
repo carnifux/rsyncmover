@@ -71,13 +71,15 @@ public class RsyncMover {
     }
 
     public static synchronized void init(final Config config) {
-        final Audit audit = new Audit(config.shouldPassivateAudit(), config.getAuditPassivateLocation(), (Audit) components.get(Audit.class));
+        final Audit audit = new Audit(config.shouldPassivateAudit(), config.getAuditPassivateLocation(),
+                (Audit) components.get(Audit.class));
         components.put(Audit.class, audit);
         // don't add to threads in components, as audit doesn't get shut down
         Runtime.getRuntime().addShutdownHook(new Thread(audit::shutdown));
 
         final List<Emailer> emailers = config.getEmailSendTime().stream()
-                .map(time -> new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(), config.getEmail().getFrom(), time, audit))
+                .map(time -> new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(),
+                        config.getEmail().getFrom(), time, audit))
                 .collect(Collectors.toList());
         components.putIfAbsent(Emailer.class, emailers);
         config.getAgents().forEach(Notifier::create);

@@ -3,3 +3,4 @@
 target/
 logs/
 test_config.xml
+.DS_Store

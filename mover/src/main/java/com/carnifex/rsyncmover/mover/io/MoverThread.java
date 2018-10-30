@@ -147,10 +147,12 @@ public class MoverThread extends Thread {
             logger.info("Moving " + pathObject.getFrom() + " to " + pathObject.getTo() + " with operator " + pathObject.getOperator().getMethod());
             final Path finalDir = pathObject.getOperator().move(pathObject.getFrom(), pathObject.getTo(), filePermissions, folderPermissions, user);
             logger.info("Move of " + pathObject.getFrom() + " finished; ended up at " + finalDir + ". " + pathObjectQueue.size() + " items remaining");
-            audit.add(new MovedEntry(pathObject.getFrom().toAbsolutePath().toString(), finalDir.toAbsolutePath().toString(), pathObject.getOperator().getMethod()));
+            audit.add(new MovedEntry(pathObject.getFrom().toAbsolutePath().toString(),
+                    finalDir.toAbsolutePath().toString(), pathObject.getOperator().getMethod()));
             pathObject.getMover().notify(new NotificationEntry(Type.MOVED, "Finished moving\n" + pathObject.getFrom()));
         } catch (Exception e) {
-            final String s = pathObject.getOperator().getMethod() + ": Error moving from " + pathObject.getFrom().toString() + " to " + pathObject.getTo().toString();
+            final String s = pathObject.getOperator().getMethod() + ": Error moving from " + pathObject.getFrom().toString()
+                    + " to " + pathObject.getTo().toString();
             logger.error(s, e);
             audit.add(new ErrorEntry(s, e));
         } finally {

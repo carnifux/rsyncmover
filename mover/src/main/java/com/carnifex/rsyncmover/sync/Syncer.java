@@ -1,17 +1,6 @@
 package com.carnifex.rsyncmover.sync;
 
 
-import com.carnifex.rsyncmover.Utilities;
-import com.carnifex.rsyncmover.audit.Audit;
-import com.carnifex.rsyncmover.audit.entry.DownloadedEntry;
-import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
-import com.carnifex.rsyncmover.audit.entry.SeenEntry;
-import com.carnifex.rsyncmover.mover.io.FileWatcher;
-import com.carnifex.rsyncmover.mover.io.Mover;
-import com.carnifex.rsyncmover.mover.io.MoverThread;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,6 +17,17 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+
+import com.carnifex.rsyncmover.Utilities;
+import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.entry.DownloadedEntry;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import com.carnifex.rsyncmover.audit.entry.SeenEntry;
+import com.carnifex.rsyncmover.mover.io.FileWatcher;
+import com.carnifex.rsyncmover.mover.io.Mover;
+import com.carnifex.rsyncmover.mover.io.MoverThread;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class Syncer extends Thread {
 
@@ -103,12 +103,14 @@ public class Syncer extends Thread {
         for (final Sftp sftp : sftps) {
             try {
                 final List<String> allFiles = sftp.listFiles();
-                logger.debug(sftp.getServerName() + ": Received following files from sftp: " + allFiles.stream().map(this::normalize).collect(Collectors.joining(", ")));
+                logger.debug(sftp.getServerName() + ": Received following files from sftp: "
+                        + allFiles.stream().map(this::normalize).collect(Collectors.joining(", ")));
                 final List<String> shouldDownload = allFiles.stream()
                         .peek(file -> audit.add(new SeenEntry(normalize(file), sftp.getServerName())))
                         .filter(file -> syncedFiles.shouldDownload(sftp.getServerName(), normalize(file)))
                         .filter(file -> {
-                            final boolean result = this.movers.isEmpty() || this.movers.stream().filter(mover -> mover.shouldSubmit(Paths.get(file))).count() == 1;
+                            final boolean result = this.movers.isEmpty()
+                                    || this.movers.stream().filter(mover -> mover.shouldSubmit(Paths.get(file))).count() == 1;
                             if (!result) {
                                 logger.warn(sftp.getServerName() + ": Not downloading " + file + ", no single mover able to match it");
                             }
@@ -137,7 +139,6 @@ public class Syncer extends Thread {
                                 }
                                 syncedFiles.addDownloadedPath(sftp.getServerName(), normalize(path));
                                 audit.add(new DownloadedEntry(path, sftp.getServerName()));
-
                             }, executorService);
                             logger.info("Finished downloading " + fileToDownload + " in " + (System.currentTimeMillis() - start) / 1000 + "ms");
                         } catch (Exception e) {

@@ -186,8 +186,8 @@ public class Sftp {
             try {
                 try {
                     ssh.loadKnownHosts();
-                } catch (IOException e) {
-                    logger.warn(server + ": Error loading known hosts, continuing");
+                } catch (final IOException e) {
+                    logger.trace(server + ": Error loading known hosts, continuing", e);
                 }
                 if (hostKey != null) {
                     ssh.addHostKeyVerifier(hostKey);
