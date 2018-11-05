@@ -196,10 +196,11 @@ public class RsyncMover {
         // should contain audit, config watcher, and a list of shutdown hooks (thread)
         if (components.size() != 3 && !config.isRunOnce()) {
             if (components.size() != 2 || !components.keySet().equals(new HashSet<>(Arrays.asList(Audit.class, ConfigWatcher.class)))) {
-                logger.fatal("Did not remove all components - shutdown not successful.");
-                logger.fatal("Remaining components: ");
-                components.keySet().forEach(key -> logger.fatal(key));
-                throw new RuntimeException();
+                final StringBuilder msg = new StringBuilder("Did not remove all components - shutdown not successful.");
+                msg.append(" Remaining components: ");
+                components.keySet().forEach(key -> msg.append(key).append(", "));
+                logger.fatal(msg.toString());
+                throw new RuntimeException(msg.toString());
             }
         }
         ((Set<Thread>) components.computeIfAbsent(Thread.class, ignore -> new HashSet<>()))
