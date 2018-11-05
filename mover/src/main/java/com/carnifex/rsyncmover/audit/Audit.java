@@ -29,8 +29,6 @@ import java.util.stream.Collectors;
 
 import com.carnifex.rsyncmover.audit.entry.Entry;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
-import com.carnifex.rsyncmover.inject.Bean;
-import com.carnifex.rsyncmover.inject.Inject;
 import com.carnifex.rsyncmover.mover.io.MoverThread;
 import com.carnifex.rsyncmover.sync.Sftp;
 import com.carnifex.rsyncmover.sync.Sftp.DownloadWatcher;
@@ -38,7 +36,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 
-public class Audit extends Thread implements Bean  {
+public class Audit extends Thread {
 
     private static final List<Type> types = Arrays.asList(Type.values());
     private static final long persistInterval = 5 * 1000 * 60; // 5 minutes
@@ -53,27 +51,9 @@ public class Audit extends Thread implements Bean  {
     private volatile long nextPersist;
     private volatile boolean needToPersist;
     private volatile boolean persisted;
-    @Inject
     private transient List<DownloadWatcher> downloadWatchers;
-    @Inject
     private transient List<Sftp> sftps;
-    @Inject
     private transient List<MoverThread> moverThreads;
-
-    @Override
-    public boolean shouldBeRecreated() {
-        return false;
-    }
-
-    @Override
-    public boolean isSingleton() {
-        return true;
-    }
-
-    @Override
-    public void initialise() {
-
-    }
 
     public Audit(final boolean persist, final String persistLocation, final Audit old) {
         super("AuditThread");
