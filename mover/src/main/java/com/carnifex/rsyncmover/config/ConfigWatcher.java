@@ -1,18 +1,26 @@
 package com.carnifex.rsyncmover.config;
 
 
-import com.carnifex.rsyncmover.RsyncMover;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
+import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 
-import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
-import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
-import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
+import com.carnifex.rsyncmover.RsyncMover;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import com.carnifex.rsyncmover.notifications.Notifier;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class ConfigWatcher extends Thread {
 
@@ -80,6 +88,7 @@ public class ConfigWatcher extends Thread {
                             logger.error("Exception loading invalid config", e);
                             logger.error("Reloading previous valid config");
                             RsyncMover.reinit(previousConfig);
+                            Notifier.notifiyAll(new ErrorEntry("Exception loading invalid config", e));
                         }
                     }
                 } else {

@@ -19,6 +19,7 @@ import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 import com.carnifex.rsyncmover.audit.entry.MovedEntry;
 import com.carnifex.rsyncmover.audit.entry.NotificationEntry;
 import com.carnifex.rsyncmover.mover.operators.MoveOperator;
+import com.carnifex.rsyncmover.notifications.Notifier;
 import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -154,7 +155,9 @@ public class MoverThread extends Thread {
             final String s = pathObject.getOperator().getMethod() + ": Error moving from " + pathObject.getFrom().toString()
                     + " to " + pathObject.getTo().toString();
             logger.error(s, e);
-            audit.add(new ErrorEntry(s, e));
+            final ErrorEntry entry = new ErrorEntry(s, e);
+            audit.add(entry);
+            Notifier.notifiyAll(entry);
         } finally {
             if (simultaneousLock != null) {
                 simultaneousLock.unlock();

@@ -1,6 +1,12 @@
 package com.carnifex.rsyncmover.notifications;
 
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
 import com.carnifex.rsyncmover.audit.Type;
 import com.carnifex.rsyncmover.audit.entry.Entry;
 import com.carnifex.rsyncmover.beans.RsyncMover.Notification.Agent;
@@ -8,12 +14,6 @@ import com.carnifex.rsyncmover.beans.RsyncMover.Notification.Agent.Params.Param;
 import com.carnifex.rsyncmover.notifications.impl.Pushbullet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 public abstract class Notifier {
 
@@ -33,6 +33,10 @@ public abstract class Notifier {
         if (supportedTypes.contains(entry.getType())) {
             notifyInternal(entry);
         }
+    }
+
+    public static void notifiyAll(final Entry entry) {
+        cachedNotifiers.values().forEach(n -> n.notify(entry));
     }
 
     public static Notifier create(final Agent agent) {

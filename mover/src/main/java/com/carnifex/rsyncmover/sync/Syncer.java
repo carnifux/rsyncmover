@@ -26,6 +26,7 @@ import com.carnifex.rsyncmover.audit.entry.SeenEntry;
 import com.carnifex.rsyncmover.mover.io.FileWatcher;
 import com.carnifex.rsyncmover.mover.io.Mover;
 import com.carnifex.rsyncmover.mover.io.MoverThread;
+import com.carnifex.rsyncmover.notifications.Notifier;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -143,7 +144,9 @@ public class Syncer extends Thread {
                             logger.info("Finished downloading " + fileToDownload + " in " + (System.currentTimeMillis() - start) / 1000 + "ms");
                         } catch (Exception e) {
                             logger.error(e.getMessage(), e);
-                            audit.add(new ErrorEntry("Error downloading " + fileToDownload, e));
+                            final ErrorEntry entry = new ErrorEntry("Error downloading " + fileToDownload, e);
+                            audit.add(entry);
+                            Notifier.notifiyAll(entry);
                         }
                     }
                     downloaded = true;
