@@ -82,6 +82,7 @@ public class FileChangeWatcher extends Thread {
         if (moveImmediately) {
             logger.info("Immediately moving " + path.toString());
             filesToMoveSoon.add(new PathHolder(path, true));
+            return;
         }
         logger.info("Registering " + path.toString());
         filesToMoveSoon.add(new PathHolder(path, false));

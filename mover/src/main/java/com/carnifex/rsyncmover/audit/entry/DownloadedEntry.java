@@ -5,6 +5,7 @@ import static com.carnifex.rsyncmover.audit.Type.DOWNLOADED;
 
 public class DownloadedEntry extends Entry {
 
+    private static final long serialVersionUID = 495829634144474313L;
     private final String path;
     private final String server;
 

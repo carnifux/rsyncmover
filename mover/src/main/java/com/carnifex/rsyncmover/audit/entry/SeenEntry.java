@@ -5,6 +5,7 @@ import static com.carnifex.rsyncmover.audit.Type.SEEN;
 
 public class SeenEntry extends Entry {
 
+    private static final long serialVersionUID = -3948595252638091769L;
     private final String path;
     private final String server;
 

@@ -5,6 +5,7 @@ import static com.carnifex.rsyncmover.audit.Type.DUPLICATE;
 
 public class DuplicateEntry extends Entry {
 
+    private static final long serialVersionUID = 3903046344007797254L;
     private final String path;
 
     public DuplicateEntry(final String path) {

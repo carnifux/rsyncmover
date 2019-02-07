@@ -8,7 +8,8 @@ import static com.carnifex.rsyncmover.audit.Type.ERROR;
 
 public class ErrorEntry extends Entry {
 
-    private final Throwable throwable;
+    private static final long serialVersionUID = 2243314384957467217L;
+    private final String stacktrace;
     private final String message;
 
     public ErrorEntry(final String message) {
@@ -18,18 +19,23 @@ public class ErrorEntry extends Entry {
     public ErrorEntry(final String message, final Throwable throwable) {
         super(ERROR);
         this.message = message;
-        this.throwable = throwable;
+        // don't store the throwable as we don't know if they're serializable
+        this.stacktrace = throwable == null ? null : formatStackTrace(throwable);
+    }
+
+    private String formatStackTrace(final Throwable throwable) {
+        final StringWriter stringWriter = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(stringWriter));
+        // printwriter doesn't give us new lines
+        return stringWriter.toString().replace("\n", "<br />");
     }
 
     @Override
     public String format() {
-        if (throwable == null) {
+        if (stacktrace == null) {
             return message;
         }
-        final StringWriter stringWriter = new StringWriter();
-        throwable.printStackTrace(new PrintWriter(stringWriter));
-        // printwriter doesn't give us new lines
-        return message + "\n" + stringWriter.toString().replace("\n", "<br />");
+        return message + "\n" + stacktrace;
     }
 
     @Override
