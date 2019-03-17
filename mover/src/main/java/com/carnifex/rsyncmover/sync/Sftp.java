@@ -1,20 +1,8 @@
 package com.carnifex.rsyncmover.sync;
 
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.attribute.PosixFilePermission;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.locks.Lock;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-
 import com.carnifex.rsyncmover.Utilities;
+import com.carnifex.rsyncmover.audit.TotalDownloaded;
 import com.carnifex.rsyncmover.audit.Type;
 import com.carnifex.rsyncmover.audit.entry.NotificationEntry;
 import com.carnifex.rsyncmover.notifications.Notifier;
@@ -26,6 +14,20 @@ import net.schmizz.sshj.sftp.SFTPClient;
 import net.schmizz.sshj.xfer.TransferListener;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import java.io.IOException;
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.locks.Lock;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class Sftp {
 
@@ -45,11 +47,12 @@ public class Sftp {
     private final List<String> filesInQueue;
     private final List<Notifier> notifiers;
     private final Lock simultaneousLock;
+    private final TotalDownloaded totalDownloaded;
 
     public Sftp(final String server, final int port, final String remoteDirectory, final String remoteRealDirectory,
                 final String user, final String pass, final String hostKey,
                 final Set<PosixFilePermission> filePermissions, final long maxDownloadSpeed, final List<Notifier> notifiers,
-                final Lock simultaneousLock) {
+                final Lock simultaneousLock, final TotalDownloaded totalDownloaded) {
         this.server = server;
         this.port = port;
         this.remoteDirectory = remoteDirectory;
@@ -64,6 +67,7 @@ public class Sftp {
         this.filesInQueue = new ArrayList<>();
         this.notifiers = notifiers;
         this.simultaneousLock = simultaneousLock;
+        this.totalDownloaded = totalDownloaded;
         logger.info("Sftp client for server " + server + ":" + port + ", monitoring " + remoteDirectory + " successfully initialized");
     }
 
@@ -128,6 +132,12 @@ public class Sftp {
                         logger.error(server + ": Failed downloading file " + file);
                         throw e;
                     } finally {
+                        try {
+                            final long size = Files.size(Paths.get(target));
+                            totalDownloaded.increment(BigInteger.valueOf(size));
+                        } catch (final Exception e) {
+                            logger.error(e.getMessage(), e);
+                        }
                         filesInQueue.remove(file);
                         watcher.finished();
                         if (simultaneousLock != null) {

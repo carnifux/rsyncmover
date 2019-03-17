@@ -1,39 +1,27 @@
 package com.carnifex.rsyncmover.audit;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InvalidClassException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import com.carnifex.rsyncmover.audit.entry.Entry;
+import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
+import com.carnifex.rsyncmover.mover.io.MoverThread;
+import com.carnifex.rsyncmover.sync.Sftp;
+import com.carnifex.rsyncmover.sync.Sftp.DownloadWatcher;
+import org.apache.commons.io.FileUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.io.*;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-
-import com.carnifex.rsyncmover.audit.entry.Entry;
-import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
-import com.carnifex.rsyncmover.mover.io.MoverThread;
-import com.carnifex.rsyncmover.sync.Sftp;
-import com.carnifex.rsyncmover.sync.Sftp.DownloadWatcher;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 
 public class Audit extends Thread {
@@ -54,6 +42,7 @@ public class Audit extends Thread {
     private transient List<DownloadWatcher> downloadWatchers;
     private transient List<Sftp> sftps;
     private transient List<MoverThread> moverThreads;
+    private transient TotalDownloaded totalDownloaded;
 
     public Audit(final boolean persist, final String persistLocation, final Audit old) {
         super("AuditThread");
@@ -92,6 +81,10 @@ public class Audit extends Thread {
 
     public void addSftp(final Sftp sftp) {
         this.sftps.add(sftp);
+    }
+
+    public void setTotalDownloaded(final TotalDownloaded totalDownloaded) {
+        this.totalDownloaded = totalDownloaded;
     }
 
     public void resetTransients() {
@@ -361,6 +354,12 @@ public class Audit extends Thread {
         builder.append(days).append(" day").append(days != 1 ? "s " : " ");
         builder.append(hours).append(" hour").append(hours != 1 ? "s " : " ");
         builder.append(minutes).append(" minute").append(minutes != 1 ? "s" : "");
+        if (totalDownloaded != null) {
+            final BigInteger total = totalDownloaded.get();
+            if (total != null) {
+                builder.append(" - Total downloaded: ").append(FileUtils.byteCountToDisplaySize(total));
+            }
+        }
         return builder.append("<br /><br />").toString();
     }
 

@@ -1,21 +1,8 @@
 package com.carnifex.rsyncmover;
 
 
-import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import com.carnifex.rsyncmover.audit.Audit;
+import com.carnifex.rsyncmover.audit.TotalDownloaded;
 import com.carnifex.rsyncmover.config.Config;
 import com.carnifex.rsyncmover.config.ConfigLoader;
 import com.carnifex.rsyncmover.config.ConfigWatcher;
@@ -31,6 +18,14 @@ import com.carnifex.rsyncmover.sync.Syncer;
 import com.carnifex.rsyncmover.web.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class RsyncMover {
 
@@ -77,6 +72,10 @@ public class RsyncMover {
         // don't add to threads in components, as audit doesn't get shut down
         Runtime.getRuntime().addShutdownHook(new Thread(audit::shutdown));
 
+        final TotalDownloaded totalDownloaded = new TotalDownloaded(config.getTotalDownloadedPersistLocation());
+        audit.setTotalDownloaded(totalDownloaded);
+        components.put(TotalDownloaded.class, totalDownloaded);
+
         final List<Emailer> emailers = config.getEmailSendTime().stream()
                 .map(time -> new Emailer(config.getEmail().isEmailReport(), config.getEmail().getTo(),
                         config.getEmail().getFrom(), time, audit))
@@ -105,7 +104,7 @@ public class RsyncMover {
         }
 
         if (config.downloadFiles()) {
-            final List<Sftp> sftps = initSshs(config, simultaneousLock);
+            final List<Sftp> sftps = initSshs(config, simultaneousLock, totalDownloaded);
             final MoverThread moverThread = config.moveFiles() ? (MoverThread) components.get(MoverThread.class) : null;
             final Syncer syncer = initSyncer(config, movers, sftps, moverThread, audit);
             components.putIfAbsent(Sftp.class, sftps);
@@ -128,7 +127,7 @@ public class RsyncMover {
         currentConfig = config;
     }
 
-    private static List<Sftp> initSshs(final Config config, final Lock simultaneousLock) {
+    private static List<Sftp> initSshs(final Config config, final Lock simultaneousLock, final TotalDownloaded totalDownloaded) {
         return config.getServers().stream()
             .flatMap(server -> server.getDirectories().stream()
                     .map(dir -> dir.getDirectory())
@@ -139,11 +138,10 @@ public class RsyncMover {
                         return new Sftp(server.getHost(), server.getPort(),
                                 dir.getDirectory(), dir.getRealDirectory(), server.getUser(), server.getPass(),
                                 server.getHostKey(), config.getFilePermissions(), config.getMaxDownloadSpeedBytes(), notifiers,
-                                simultaneousLock);
+                                simultaneousLock, totalDownloaded);
                     }))
             .collect(Collectors.toList());
     }
-
 
     public static synchronized void reinit(final String configPath) {
         shutdownAll(currentConfig);
@@ -171,6 +169,12 @@ public class RsyncMover {
             final FileChangeWatcher fileChangeWatcher = (FileChangeWatcher) components.remove(FileChangeWatcher.class);
             if (fileChangeWatcher != null) {
                 fileChangeWatcher.interrupt();
+            }
+        }
+        if (components.containsKey(TotalDownloaded.class)) {
+            final TotalDownloaded totalDownloaded = (TotalDownloaded) components.remove(TotalDownloaded.class);
+            if (totalDownloaded != null) {
+                totalDownloaded.shutdown();
             }
         }
         if (components.containsKey(Syncer.class)) {

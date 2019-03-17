@@ -1,6 +1,14 @@
 package com.carnifex.rsyncmover.config;
 
 
+import com.carnifex.rsyncmover.beans.RsyncMover;
+import com.carnifex.rsyncmover.beans.RsyncMover.Servers.Server;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.LoggerConfig;
+
 import javax.xml.bind.annotation.XmlElement;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -16,14 +24,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import com.carnifex.rsyncmover.beans.RsyncMover;
-import com.carnifex.rsyncmover.beans.RsyncMover.Servers.Server;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.config.LoggerConfig;
 
 public class Config {
 
@@ -196,6 +196,10 @@ public class Config {
     public boolean isAllowSimultaneousTasks() {
         final Boolean tasks = config.isAllowSimultaneousTasks();
         return tasks != null ? tasks : getDefault(config, "isAllowSimultaneousTasks", boolean.class);
+    }
+
+    public String getTotalDownloadedPersistLocation() {
+        return config.getAudit().getTotalDownloadedPersistLocation();
     }
 
     private long getMultiplier(final String freeSpace) {
