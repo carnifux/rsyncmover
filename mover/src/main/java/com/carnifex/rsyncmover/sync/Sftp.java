@@ -132,12 +132,6 @@ public class Sftp {
                         logger.error(server + ": Failed downloading file " + file);
                         throw e;
                     } finally {
-                        try {
-                            final long size = Files.size(Paths.get(target));
-                            totalDownloaded.increment(BigInteger.valueOf(size));
-                        } catch (final Exception e) {
-                            logger.error(e.getMessage(), e);
-                        }
                         filesInQueue.remove(file);
                         watcher.finished();
                         if (simultaneousLock != null) {
@@ -278,6 +272,7 @@ public class Sftp {
         }
 
         void update(final long transferred) {
+            totalDownloaded.increment(BigInteger.valueOf(transferred));
             final long transferredNow = lastTransferred > transferred ? lastTransferred - transferred : transferred - lastTransferred;
             lastTransferred = transferred;
             if (this.rateLimiter != null) {
@@ -298,10 +293,10 @@ public class Sftp {
 
         private String formatBytes(final long bytes) {
             if (bytes > 1_000_000) { // if > 1mb
-                return String.valueOf(round(((float) bytes / 1_000_000f), 2)) + "MiB";
+                return round(((float) bytes / 1_000_000f), 2) + "MiB";
             }
             if (bytes > 1_000) {
-                return String.valueOf(round(((float) bytes / 1_000f), 2)) + "KiB";
+                return round(((float) bytes / 1_000f), 2) + "KiB";
             }
             return bytes + "B";
         }
