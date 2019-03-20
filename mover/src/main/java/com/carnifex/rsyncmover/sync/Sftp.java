@@ -272,7 +272,6 @@ public class Sftp {
         }
 
         void update(final long transferred) {
-            totalDownloaded.increment(BigInteger.valueOf(transferred));
             final long transferredNow = lastTransferred > transferred ? lastTransferred - transferred : transferred - lastTransferred;
             lastTransferred = transferred;
             if (this.rateLimiter != null) {
@@ -311,6 +310,7 @@ public class Sftp {
 
         private void finished() {
             this.currentlyActive = false;
+            totalDownloaded.increment(BigInteger.valueOf(size));
         }
 
         public String getFileName() {

@@ -215,7 +215,7 @@ public class Audit extends Thread {
         }
     }
 
-    public String formatAll() {
+    public String formatAll(final boolean all) {
         addEntriesToMap(readPersistedFile(), allEntries);
         final StringBuilder message = new StringBuilder();
         message.append("<html><head><style>" +
@@ -301,7 +301,7 @@ public class Audit extends Thread {
                         "<input type=\"text\" id=\"testmover\" /><button onclick=\"testMover()\">Test Mover</button>");
         types.stream().filter(allEntries::containsKey).forEachOrdered(type -> {
             message.append(makeTitle(type));
-            message.append(makeContent(allEntries.get(type)));
+            message.append(makeContent(allEntries.get(type), all));
             message.append("</div></div>");
         });
         message.append("</body></html>");
@@ -363,9 +363,13 @@ public class Audit extends Thread {
         return builder.append("<br /><br />").toString();
     }
 
-    private String makeContent(final Set<Entry> strings) {
-        return strings.stream().map(entry -> entry.getCreatedAt().toString() + ": " + entry.format())
-                .sorted(Comparator.reverseOrder()).collect(Collectors.joining("<br />"));
+    private String makeContent(final Set<Entry> strings, final boolean all) {
+        final LocalDateTime lastWeek = LocalDateTime.now().minusDays(7);
+        return strings.stream()
+                .filter(entry -> all || entry.getCreatedAt().isBefore(lastWeek))
+                .map(entry -> entry.getCreatedAt().toString() + ": " + entry.format())
+                .sorted(Comparator.reverseOrder())
+                .collect(Collectors.joining("<br />"));
     }
 
     private String makeEmailContent(final Set<Entry> strings) {

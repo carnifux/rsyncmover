@@ -67,7 +67,8 @@ public class Server extends NanoHTTPD {
         } else if (uri.endsWith("downloadqueuestatus")) {
             return newFixedLengthResponse(audit.getDownloadQueueStatus());
         } else {
-            return newFixedLengthResponse(audit.formatAll());
+            final boolean all = Boolean.valueOf(session.getParms().getOrDefault("all", "false"));
+            return newFixedLengthResponse(audit.formatAll(all));
         }
     }
 
