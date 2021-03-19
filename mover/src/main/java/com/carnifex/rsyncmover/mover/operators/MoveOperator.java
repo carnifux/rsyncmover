@@ -129,7 +129,8 @@ public abstract class MoveOperator {
                 try {
                     final String[] split = fileObject.getName().replace(".class", "").replace(")", "").split(Pattern.quote(File.separator));
                     final Class<?> clazz = Class.forName(PACKAGE_NAME + "." + split[split.length - 1]);
-                    if (MoveOperator.class.isAssignableFrom(clazz) && clazz != MoveOperator.class) {
+                    if (MoveOperator.class.isAssignableFrom(clazz) && clazz != MoveOperator.class
+                            && !clazz.isAnonymousClass()) {
                         MoveOperator op;
                         try {
                             final Constructor<?> constructor = clazz.getDeclaredConstructor();
