@@ -5,7 +5,7 @@ import com.carnifex.rsyncmover.audit.Audit;
 import com.carnifex.rsyncmover.audit.entry.ErrorEntry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.xbill.DNS.*;
+
 
 import javax.mail.Message;
 import javax.mail.MessagingException;
@@ -99,23 +99,24 @@ public class Emailer extends Thread {
 
 
     public  String getMXRecordsForEmailAddress(String address) {
-        try {
-            final String hostName = address.split("@")[1];
+        throw new RuntimeException("this doesnt work and i dont care");
+        // try {
+        //     final String hostName = address.split("@")[1];
 
-            final Record[] records = new Lookup(hostName, Type.MX).run();
-            if (records == null || records.length == 0) {
-                throw new RuntimeException("No MX records found for domain " + hostName + ".");
-            }
+        //     final Record[] records = new Lookup(hostName, Type.MX).run();
+        //     if (records == null || records.length == 0) {
+        //         throw new RuntimeException("No MX records found for domain " + hostName + ".");
+        //     }
 
-            return Stream.of(records)
-                    .map(record -> (MXRecord) record)
-                    .sorted(Comparator.comparingInt(MXRecord::getPriority))
-                    .findFirst()
-                    .map(MXRecord::getTarget)
-                    .map(Name::toString)
-                    .orElseThrow(() -> new RuntimeException("Unable to find record for email " + address));
-        } catch (Throwable t) {
-            throw new RuntimeException(t);
-        }
+        //     return Stream.of(records)
+        //             .map(record -> (MXRecord) record)
+        //             .sorted(Comparator.comparingInt(MXRecord::getPriority))
+        //             .findFirst()
+        //             .map(MXRecord::getTarget)
+        //             .map(Name::toString)
+        //             .orElseThrow(() -> new RuntimeException("Unable to find record for email " + address));
+        // } catch (Throwable t) {
+        //     throw new RuntimeException(t);
+        // }
     }
 }
